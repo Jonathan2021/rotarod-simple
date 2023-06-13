@@ -1,0 +1,2 @@
+Jquery referenced statically and not over the internet
+Don't forget to replace 'http://localhost:3000/auth/login' with your actual server's address and the route where you handle login requests. (in login.js)
