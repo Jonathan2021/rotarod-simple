@@ -10,8 +10,9 @@ interface Config {
 }
 
 interface User {
-  displayName: string;
   dn: string;
+  displayName: string;
+  samAccountName: string;
 }
 
 const config: Config = { 
@@ -23,7 +24,7 @@ const config: Config = {
 
 const groupName = 'BRA - Neuroscience';
 
-async function findUser(sAMAccountName: string): Promise<User | null> {
+async function findUser(samAccountName: string): Promise<User | null> {
   const client = new Client({
     url: config.url,
   });
@@ -32,21 +33,29 @@ async function findUser(sAMAccountName: string): Promise<User | null> {
 
   const { searchEntries } = await client.search(config.baseDN, {
     scope: 'sub',
-    filter: `(sAMAccountName=${sAMAccountName})`,
+    filter: `(samAccountName=${samAccountName})`,
   });
 
   await client.unbind();
 
-  return searchEntries[0] || null;
+  return searchEntries[0] 
+    ? { 
+      dn: searchEntries[0].dn, 
+      displayName: Array.isArray(searchEntries[0].displayName) 
+        ? (searchEntries[0].displayName[0] as string) // explicit type cast to string
+        : (searchEntries[0].displayName as string),   // explicit type cast to string
+      samAccountName 
+    } 
+    : null;
 }
 
-async function authenticate(userDn: string, password: string): Promise<boolean> {
+async function authenticate(userDN: string, password: string): Promise<boolean> {
   const client = new Client({
     url: config.url,
   });
 
   try {
-    await client.bind(userDn, password);
+    await client.bind(userDN, password);
     await client.unbind();
     return true;
   } catch (e) {
@@ -56,13 +65,13 @@ async function authenticate(userDn: string, password: string): Promise<boolean> 
 }
 
 export async function getUserAcc(req: Request, res: Response): Promise<void> {
-  const sAMAccountName = req.body.firstName;
+  const samAccountName = req.body.CorporateAccount;
 
-  const user = await findUser(sAMAccountName);
+  const user = await findUser(samAccountName);
 
   if (!user) {
-    console.log(`User: ${sAMAccountName} not found.`);
-    res.status(404).send(`User: ${sAMAccountName} not found.`);
+    console.log(`User: ${samAccountName} not found.`);
+    res.status(404).send(`User: ${samAccountName} not found.`);
   } else {
     console.log(user);
     res.send(user.displayName);
@@ -70,22 +79,22 @@ export async function getUserAcc(req: Request, res: Response): Promise<void> {
 }
 
 export async function setUserAuth(req: Request, res: Response): Promise<void> {
-  const sAMAccountName = req.body.Corporate_Account;
+  const samAccountName = req.body.CorporateAccount;
   const password = req.body.Password;
 
-  const user = await findUser(sAMAccountName);
+  const user = await findUser(samAccountName);
 
   if (!user) {
-    console.log(`User: ${sAMAccountName} not found.`);
-    req.session.destroy();
-    res.status(401).send({ error: `User: ${sAMAccountName} not found!` });
+    console.log(`User: ${samAccountName} not found.`);
+    req.session.destroy(() => {}); // provide an empty function as a callback
+    res.status(401).send({ error: `User: ${samAccountName} not found!` });
   } else {
     if (await authenticate(user.dn, password)) {
-      req.session.CorporateAccount = sAMAccountName;
+      req.session.CorporateAccount = samAccountName;
       res.send({ displayName: user.displayName });
     } else {
-      req.session.destroy();
-      res.status(401).send({ error: "Incorrect Corporate Account/Password combination!" });
+      req.session.destroy(() => {}); // provide an empty function as a callback
+      res.status(401).send({ error: "Incorrect corporate account/password combination!" });
     }
   }
 }
