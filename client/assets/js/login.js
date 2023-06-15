@@ -5,21 +5,22 @@ $(document).ready(function() {
         var CorporateAccount = $('#CorporateAccount').val();
         var Password = $('#Password').val();
 
-        // Debug: Print the captured values to the console
-        console.log('CorporateAccount: ', CorporateAccount);
-        console.log('Password: ', Password);
-
         $.post('/auth/login', {
             CorporateAccount: CorporateAccount,
             Password: Password
         }, function(data, status) {
-            if (status === 'success') {
+            if (status === 'success' && data.displayName) {
                 // Handle successful login, e.g. redirect to the main page
                 window.location.href = '/main.html';
             } else {
-                // Handle failed login, e.g. show an error message
-                alert('Login failed. Please try again.');
+                // Handle failed login, e.g. show an error message and clear password field
+                $('#login-error').text('Login failed. Please try again.');
+                $('#Password').val('');
             }
+        }).fail(function() {
+            // Handle failed request, e.g. server error
+            $('#login-error').text('Login failed. Please try again.');
+            $('#Password').val('');
         });
     });
 });

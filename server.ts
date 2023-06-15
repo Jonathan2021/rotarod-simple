@@ -2,6 +2,7 @@ import session from 'express-session';
 import express from 'express';
 import path from 'path';
 import { setUserAuth, getUserAcc } from './server/controllers/auth';
+import fs from 'fs';
 
 declare module 'express-session' {
   export interface SessionData {
@@ -36,30 +37,40 @@ app.use(express.urlencoded());
 // Parse JSON bodies (as sent by API clients)
 app.use(express.json());
 
-// Serve static files from the 'client' directory
-app.use(express.static('client'));
-
-// Serve client/assets directory static files
-app.use('/assets', express.static(path.join(__dirname, 'client/assets')));
-
-// Login route
-app.post('/auth/login', setUserAuth);
-
 // Middleware to check if the user is authenticated
 const authenticateUser = (req, res, next) => {
   if (!req.session.CorporateAccount) {
-    res.status(401).send({ error: "Not authenticated" });
+    console.log("Back to login")
+    console.log(req.url)
+    res.redirect('/auth/login.html');
   } else {
     next();
   }
 };
 
-// Insert the routes for your application here
+// Define a list of routes to be excluded from authentication
+const excludeRoutes = ['/auth/login', '/auth/login.html', '/assets/css/login.css', '/assets/js/login.js'];
 
-// Apply the middleware function to the route serving main.html
-app.get('/main.html', authenticateUser, (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/main.html'));
+// Apply middleware to the application
+app.use((req, res, next) => {
+  // Check if the current URL is in the list of excluded routes
+  if (excludeRoutes.includes(req.url)) {
+    // If it is, simply continue without authentication
+    next();
+  } else {
+    // If it isn't, authenticate the user
+    authenticateUser(req, res, next);
+  }
 });
+
+// Serve static files from the 'client' directory
+app.use(express.static('client'));
+
+// Serve client/assets directory static files
+//app.use('/assets', express.static(path.join(__dirname, 'client/assets')));
+
+// Define routes AFTER middleware
+app.post('/auth/login', setUserAuth);
 
 app.get('/', (req, res) => {
   if (req.session.CorporateAccount) {
