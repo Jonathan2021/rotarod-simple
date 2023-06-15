@@ -12,13 +12,13 @@ import { open } from 'sqlite';
 
   await db.run(`
     CREATE TABLE "Mouse_Group_Family" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "name" varchar
     )`);
 
   await db.run(`
     CREATE TABLE "Mouse_Group" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "group_family_id" integer,
     "precision" varchar,
     FOREIGN KEY ("group_family_id") REFERENCES "Mouse_Group_Family" ("id")
@@ -26,20 +26,20 @@ import { open } from 'sqlite';
 
   await db.run(`
     CREATE TABLE "Mouse" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "group_id" integer,
     FOREIGN KEY ("group_id") REFERENCES "Mouse_Group" ("id")
     )`);
 
   await db.run(`
     CREATE TABLE "Cage" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "cage_nb" integer
     )`);
 
   await db.run(`
     CREATE TABLE "Mouse_Cage" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "mouse_id" integer,
     "cage_id" integer,
     FOREIGN KEY ("mouse_id") REFERENCES "Mouse" ("id"),
@@ -50,7 +50,7 @@ import { open } from 'sqlite';
 
   await db.run(`
     CREATE TABLE "Experiment" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "title" varchar,
     "description" varchar,
     "creation_date" timestamp
@@ -67,14 +67,14 @@ import { open } from 'sqlite';
 
   await db.run(`
     CREATE TABLE "Experimentator" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "firstname" varchar,
     "surname" varchar
     )`);
 
   await db.run(`
     CREATE TABLE "Daily_Experiment" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "experiment_id" integer,
     "experimentator_id" integer,
     "date" varchar,
@@ -88,7 +88,7 @@ import { open } from 'sqlite';
 
   await db.run(`
     CREATE TABLE "Trials" (
-    "id" integer PRIMARY KEY,
+    "id" integer PRIMARY KEY AUTOINCREMENT,
     "daily_experiment_id" integer,
     FOREIGN KEY ("daily_experiment_id") REFERENCES "Daily_Experiment" ("id")
     )`);
@@ -103,5 +103,6 @@ import { open } from 'sqlite';
     FOREIGN KEY ("trial_id") REFERENCES "Trials" ("id")
     )`);
   
+
   console.log('Database and tables created successfully');
 })();
