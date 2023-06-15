@@ -10,97 +10,98 @@ import { open } from 'sqlite';
 
   // Execute SQL queries to create tables
 
-  // MouseGroupFamily
   await db.run(`
-    CREATE TABLE MouseGroupFamily (
-      id INTEGER PRIMARY KEY,
-      name TEXT
-    )
-  `);
-
-  // MouseGroup
-  await db.run(`
-    CREATE TABLE MouseGroup (
-      id INTEGER PRIMARY KEY,
-      mouse_group_family_id INTEGER,
-      precision TEXT,
-      FOREIGN KEY (mouse_group_family_id) REFERENCES MouseGroupFamily(id)
-    )
-  `);
-
-  // Mouse
-  await db.run(`
-    CREATE TABLE Mouse (
-      id INTEGER PRIMARY KEY,
-      mouse_group_id INTEGER,
-      FOREIGN KEY (mouse_group_id) REFERENCES MouseGroup(id)
-    )
-  `);
-
-  // Experiment
-  await db.run(`
-    CREATE TABLE Experiment (
-      id INTEGER PRIMARY KEY,
-      description TEXT
-    )
-  `);
-
-  // Experimentator
-  await db.run(`
-    CREATE TABLE Experimentator (
-      id INTEGER PRIMARY KEY,
-      firstname TEXT,
-      surname TEXT
-    )
-  `);
-
-  // Daily_Experiment
-  await db.run(`
-    CREATE TABLE Daily_Experiment (
-      id INTEGER PRIMARY KEY,
-      experiment_id INTEGER,
-      experimentator INTEGER,
-      date TEXT,
-      acclimatation_time TEXT,
-      temperature REAL,
-      lux INTEGER,
-      humidity INTEGER,
-      FOREIGN KEY (experiment_id) REFERENCES Experiment(id),
-      FOREIGN KEY (experimentator) REFERENCES Experimentator(id)
-    )
-  `);
-
-  // Trials
-  await db.run(`
-    CREATE TABLE Trials (
-      id INTEGER PRIMARY KEY,
-      daily_experiment_id INTEGER,
-      time TEXT,
-      FOREIGN KEY (daily_experiment_id) REFERENCES Daily_Experiment(id)
-    )
-  `);
-
-  // Trial_line
-  await db.run(`
-    CREATE TABLE Trial_line (
-      mouse_id INTEGER,
-      trial_id INTEGER,
-      duration REAL,
-      FOREIGN KEY (mouse_id) REFERENCES Mouse(id),
-      FOREIGN KEY (trial_id) REFERENCES Trials(id)
-    )
-  `);
-
-  // Create indexes
-  await db.run(`
-    CREATE INDEX idx_trial_line_mouse_id
-    ON Trial_line (mouse_id)
-  `);
+    CREATE TABLE "Mouse_Group_Family" (
+    "id" integer PRIMARY KEY,
+    "name" varchar
+    )`);
 
   await db.run(`
-    CREATE INDEX idx_trial_line_trial_id
-    ON Trial_line (trial_id)
-  `);
+    CREATE TABLE "Mouse_Group" (
+    "id" integer PRIMARY KEY,
+    "group_family_id" integer,
+    "precision" varchar,
+    FOREIGN KEY ("group_family_id") REFERENCES "Mouse_Group_Family" ("id")
+    )`);
 
+  await db.run(`
+    CREATE TABLE "Mouse" (
+    "id" integer PRIMARY KEY,
+    "group_id" integer,
+    FOREIGN KEY ("group_id") REFERENCES "Mouse_Group" ("id")
+    )`);
+
+  await db.run(`
+    CREATE TABLE "Cage" (
+    "id" integer PRIMARY KEY,
+    "cage_nb" integer
+    )`);
+
+  await db.run(`
+    CREATE TABLE "Mouse_Cage" (
+    "id" integer PRIMARY KEY,
+    "mouse_id" integer,
+    "cage_id" integer,
+    FOREIGN KEY ("mouse_id") REFERENCES "Mouse" ("id"),
+    FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id")
+    )`);
+  
+  await db.run(`Create UNIQUE INDEX "mouse_cage_index" ON "Mouse_Cage" ("mouse_id", "cage_id")`);
+
+  await db.run(`
+    CREATE TABLE "Experiment" (
+    "id" integer PRIMARY KEY,
+    "title" varchar,
+    "description" varchar,
+    "creation_date" timestamp
+    )`);
+
+  await db.run(`
+    CREATE TABLE "Cage_Experiment" (
+    "mouse_cage_id" integer,
+    "experiment_id" integer,
+    PRIMARY KEY ("mouse_cage_id", "experiment_id"),
+    FOREIGN KEY ("mouse_cage_id") REFERENCES "Mouse_Cage" ("id"),
+    FOREIGN KEY ("experiment_id") REFERENCES "Experiment" ("id")
+    )`);
+
+  await db.run(`
+    CREATE TABLE "Experimentator" (
+    "id" integer PRIMARY KEY,
+    "firstname" varchar,
+    "surname" varchar
+    )`);
+
+  await db.run(`
+    CREATE TABLE "Daily_Experiment" (
+    "id" integer PRIMARY KEY,
+    "experiment_id" integer,
+    "experimentator_id" integer,
+    "date" varchar,
+    "acclimatation_time" varchar,
+    "temperature" float,
+    "lux" integer,
+    "humidity" integer,
+    FOREIGN KEY ("experiment_id") REFERENCES "Experiment" ("id"),
+    FOREIGN KEY ("experimentator_id") REFERENCES "Experimentator" ("id")
+    )`);
+
+  await db.run(`
+    CREATE TABLE "Trials" (
+    "id" integer PRIMARY KEY,
+    "daily_experiment_id" integer,
+    FOREIGN KEY ("daily_experiment_id") REFERENCES "Daily_Experiment" ("id")
+    )`);
+
+  await db.run(`
+    CREATE TABLE "Trial_line" (
+    "mouse_id" integer,
+    "trial_id" integer,
+    "duration" float,
+    PRIMARY KEY ("mouse_id", "trial_id"),
+    FOREIGN KEY ("mouse_id") REFERENCES "Mouse" ("id"),
+    FOREIGN KEY ("trial_id") REFERENCES "Trials" ("id")
+    )`);
+  
   console.log('Database and tables created successfully');
 })();
