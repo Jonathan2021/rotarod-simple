@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Experiment</title>
+    <script src="/assets/js/experiment.js" defer></script>
+  </head>
+  <body>
+    <h1>Experiment</h1>
+    <p>Experiment ID: <span id="experimentId"><%= experimentId %></span></p>
+
+    <table id="cagesTable">
+      <thead>
+        <tr>
+          <th>Cage Number</th>
+          <th>Mouse IDs</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rows will be populated dynamically -->
+      </tbody>
+    </table>
+
+    <button id="addCageBtn">Add Cage</button>
+  </body>
+</html>

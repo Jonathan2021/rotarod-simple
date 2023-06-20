@@ -2,7 +2,11 @@ import session from 'express-session';
 import express from 'express';
 import path from 'path';
 import { setUserAuth, getUserAcc } from './server/controllers/auth';
+import { getCagesForExperiment, addCageToExperiment } from './server/utils/cageUtils';
 import fs from 'fs';
+import { open } from 'sqlite';
+import sqlite3 from 'sqlite3';
+
 
 declare module 'express-session' {
   export interface SessionData {
@@ -12,6 +16,11 @@ declare module 'express-session' {
 }
 
 const app: express.Application = express();
+
+// Set EJS as the view engine
+app.set('view engine', 'ejs');
+// Adjust the views directory path
+app.set('views', path.join(__dirname, 'client', 'views'));
 
 app.use(
   session({
@@ -80,6 +89,46 @@ app.get('/', (req, res) => {
     // If user is not logged in, redirect to the login page
     res.redirect('/auth/login.html');
   }
+});
+
+app.post('/experiment/new', async (req, res) => {
+  const db = await open({
+    filename: path.join(__dirname, 'server', 'database', 'myDatabase.db'),
+    driver: sqlite3.Database,
+  });
+  
+  const result = await db.run(`
+    INSERT INTO "Experiment" ("title", "description", "creation_date") 
+    VALUES ("New Experiment", "No description.", date('now'))
+  `);
+
+  res.send({ experimentId: result.lastID });
+});
+
+app.get('/experiment/:id', (req, res) => {
+  // Render the experiment page with the given ID
+  res.render('experiment', { experimentId: req.params.id });
+});
+
+app.get('/api/experiment/:id/cages', async (req, res) => {
+  const experimentId = req.params.id;
+
+  const db = await open({
+    filename: path.join(__dirname, 'server', 'database', 'myDatabase.db'),
+    driver: sqlite3.Database,
+  });
+
+  const cages = await db.all(`
+    SELECT Cage.id, Cage.cage_nb, GROUP_CONCAT(Mouse_Cage.mouse_id) as mouse_ids
+    FROM Cage
+    INNER JOIN Cage_Experiment ON Cage_Experiment.cage_id = Cage.id
+    INNER JOIN Mouse_Cage ON Mouse_Cage.cage_id = Cage.id
+    WHERE Cage_Experiment.experiment_id = ?
+    GROUP BY Cage.id, Cage.cage_nb`,
+    experimentId
+  );
+
+  res.json(cages);
 });
 
 app.listen(port, function () {

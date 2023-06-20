@@ -1,13 +1,11 @@
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
+import path from 'path';
+import { getDatabase } from './utils/databaseUtils';
 
 (async () => {
   // Open the database connection
-  const db = await open({
-    filename: './database/myDatabase.db',
-    driver: sqlite3.Database
-  });
-
+  const db = await getDatabase();
   // Execute SQL queries to create tables
 
   await db.run(`
@@ -58,10 +56,10 @@ import { open } from 'sqlite';
 
   await db.run(`
     CREATE TABLE "Cage_Experiment" (
-    "mouse_cage_id" integer,
+    "cage_id" integer,
     "experiment_id" integer,
-    PRIMARY KEY ("mouse_cage_id", "experiment_id"),
-    FOREIGN KEY ("mouse_cage_id") REFERENCES "Mouse_Cage" ("id"),
+    PRIMARY KEY ("cage_id", "experiment_id"),
+    FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id"),
     FOREIGN KEY ("experiment_id") REFERENCES "Experiment" ("id")
     )`);
 
@@ -87,9 +85,10 @@ import { open } from 'sqlite';
     )`);
 
   await db.run(`
-    CREATE TABLE "Trials" (
+    CREATE TABLE "Trial" (
     "id" integer PRIMARY KEY AUTOINCREMENT,
     "daily_experiment_id" integer,
+    "time" timestamp,
     FOREIGN KEY ("daily_experiment_id") REFERENCES "Daily_Experiment" ("id")
     )`);
 
@@ -98,11 +97,27 @@ import { open } from 'sqlite';
     "mouse_id" integer,
     "trial_id" integer,
     "duration" float,
+    "mouse_order" integer,
     PRIMARY KEY ("mouse_id", "trial_id"),
     FOREIGN KEY ("mouse_id") REFERENCES "Mouse" ("id"),
-    FOREIGN KEY ("trial_id") REFERENCES "Trials" ("id")
+    FOREIGN KEY ("trial_id") REFERENCES "Trial" ("id"),
+    UNIQUE ("mouse_order", "trial_id")
     )`);
   
 
   console.log('Database and tables created successfully');
+
+  // Inserting dummy data
+  //await db.run(
+  //  `INSERT INTO "Experiment" ("title", "description", "creation_date") 
+  //  VALUES ("New Experiment", "No description.", date('now'))`);
+  
+  //await db.run(
+  //  `INSERT INTO "Mouse" ("group_id") 
+  //  VALUES (NULL)`);
+
+  //await db.run(
+  //  `INSERT INTO "Mouse" ("group_id") 
+  //  VALUES (NULL)`);
+
 })();
