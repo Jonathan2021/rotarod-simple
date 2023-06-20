@@ -109,52 +109,137 @@ export const deleteExperiment = async (id) => {
   }
 };
 
+export const createTrial = async (daily_experiment_id, time) => {
+  const db = await getDatabase();
+  
+  const result = await db.run(`
+    INSERT INTO Trial (daily_experiment_id, time)
+    VALUES (?, ?)
+  `, daily_experiment_id, time);
+  
+  return result.lastID;
+};
+
+export const updateTrial = async (id, daily_experiment_id, time) => {
+  const db = await getDatabase();
+
+  await db.run(`
+    UPDATE Trial
+    SET daily_experiment_id = ?, time = ?
+    WHERE id = ?
+  `, daily_experiment_id, time, id);
+};
+
+export const deleteTrial = async (id) => {
+  const db = await getDatabase();
+
+  await db.run(`
+    DELETE FROM Trial
+    WHERE id = ?
+  `, id);
+};
+
+export const createTrialLine = async (mouse_id, trial_id, duration, mouse_order) => {
+  const db = await getDatabase();
+  
+  const result = await db.run(`
+    INSERT INTO Trial_line (mouse_id, trial_id, duration, mouse_order)
+    VALUES (?, ?, ?, ?)
+  `, mouse_id, trial_id, duration, mouse_order);
+  
+  return result.lastID;
+};
+
+export const updateTrialLine = async (mouse_id, trial_id, duration, mouse_order) => {
+  const db = await getDatabase();
+
+  await db.run(`
+    UPDATE Trial_line
+    SET duration = ?, mouse_order = ?
+    WHERE mouse_id = ? AND trial_id = ?
+  `, duration, mouse_order, mouse_id, trial_id);
+};
+
+export const deleteTrialLine = async (mouse_id, trial_id) => {
+  const db = await getDatabase();
+
+  await db.run(`
+    DELETE FROM Trial_line
+    WHERE mouse_id = ? AND trial_id = ?
+  `, mouse_id, trial_id);
+};
+
 export const getTrialFull = async (trialId) => {
   const db = await getDatabase();
 
   const trial = await db.get(`
-    SELECT Trial.*, Trial_line.*
+    SELECT *
     FROM Trial
-    INNER JOIN Trial_line ON Trial.id = Trial_line.trial_id
-    WHERE Trial.id = ?
+    WHERE id = ?
   `, trialId);
 
-  return trial;
+  const trialLines = await db.all(`
+    SELECT *
+    FROM Trial_line
+    WHERE trial_id = ?
+  `, trialId);
+
+  return {
+    ...trial,
+    trialLines: trialLines,
+  };
 };
 
 export const getDailyExperimentFull = async (dailyExperimentId) => {
   const db = await getDatabase();
 
-  const dailyExperimentAndTrial = await db.all(`
-    SELECT Daily_Experiment.*, Trial.id as trial_id
+  const dailyExperiment = await db.get(`
+    SELECT *
     FROM Daily_Experiment
-    INNER JOIN Trial ON Daily_Experiment.id = Trial.daily_experiment_id
-    WHERE Daily_Experiment.id = ?
+    WHERE id = ?
   `, dailyExperimentId);
 
-  const trials = dailyExperimentAndTrial.map(({ trial_id }) => getTrialFull(trial_id));
+  const trials = await db.all(`
+    SELECT id
+    FROM Trial
+    WHERE daily_experiment_id = ?
+  `, dailyExperimentId);
+
+  const trialsFull = [];
+  for (let trial of trials) {
+    const trialFull = await getTrialFull(trial.id);
+    trialsFull.push(trialFull);
+  }
 
   return {
-    ...dailyExperimentAndTrial[0],
-    trials: await Promise.all(trials),
+    ...dailyExperiment,
+    trials: trialsFull,
   };
 };
 
 export const getExperimentFull = async (experimentId) => {
   const db = await getDatabase();
 
-  const experimentAndDailyExperiments = await db.all(`
-    SELECT Experiment.*, Daily_Experiment.id as daily_experiment_id, Experimentator.firstname, Experimentator.surname
+  const experiment = await db.get(`
+    SELECT *
     FROM Experiment
-    INNER JOIN Daily_Experiment ON Experiment.id = Daily_Experiment.experiment_id
-    INNER JOIN Experimentator ON Daily_Experiment.experimentator_id = Experimentator.id
-    WHERE Experiment.id = ?
+    WHERE id = ?
   `, experimentId);
 
-  const dailyExperiments = experimentAndDailyExperiments.map(({ daily_experiment_id }) => getDailyExperimentFull(daily_experiment_id));
+  const dailyExperiments = await db.all(`
+    SELECT id
+    FROM Daily_Experiment
+    WHERE experiment_id = ?
+  `, experimentId);
+
+  const dailyExperimentsFull = [];
+  for (let dailyExperiment of dailyExperiments) {
+    const dailyExperimentFull = await getDailyExperimentFull(dailyExperiment.id);
+    dailyExperimentsFull.push(dailyExperimentFull);
+  }
 
   return {
-    ...experimentAndDailyExperiments[0],
-    dailyExperiments: await Promise.all(dailyExperiments),
+    ...experiment,
+    dailyExperiments: dailyExperimentsFull,
   };
 };
