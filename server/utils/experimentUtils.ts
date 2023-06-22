@@ -1,5 +1,6 @@
 // server/utils/experimentUtils.ts
 import { getDatabase } from './databaseUtils';
+import { getCagesForExperiment, deleteCageNoTransaction } from './cageUtils';
 
 export const createExperimentator = async (firstname, surname) => {
   const db = await getDatabase();
@@ -31,25 +32,25 @@ export const deleteExperimentator = async (id) => {
   `, id);
 };
 
-export const createDailyExperiment = async (experiment_id, experimentator_id, date, acclimatation_time, temperature, lux, humidity) => {
+export const createDailyExperiment = async (experiment_id, experimentator_id, place_id, acclimatation_time, temperature, lux, humidity) => {
   const db = await getDatabase();
   
   const result = await db.run(`
-    INSERT INTO Daily_Experiment (experiment_id, experimentator_id, date, acclimatation_time, temperature, lux, humidity)
+    INSERT INTO Daily_Experiment (experiment_id, experimentator_id, place_id, acclimatation_time, temperature, lux, humidity)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `, experiment_id, experimentator_id, date, acclimatation_time, temperature, lux, humidity);
+  `, experiment_id, experimentator_id, place_id, acclimatation_time, temperature, lux, humidity);
   
   return result.lastID;
 };
 
-export const updateDailyExperiment = async (id, experiment_id, experimentator_id, date, acclimatation_time, temperature, lux, humidity) => {
+export const updateDailyExperiment = async (id, experiment_id, experimentator_id, place_id, acclimatation_time, temperature, lux, humidity) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE Daily_Experiment
-    SET experiment_id = ?, experimentator_id = ?, date = ?, acclimatation_time = ?, temperature = ?, lux = ?, humidity = ?
+    SET experiment_id = ?, experimentator_id = ?, place_id = ?, acclimatation_time = ?, temperature = ?, lux = ?, humidity = ?
     WHERE id = ?
-  `, experiment_id, experimentator_id, date, acclimatation_time, temperature, lux, humidity, id);
+  `, experiment_id, experimentator_id, place_id, acclimatation_time, temperature, lux, humidity, id);
 };
 
 export const deleteDailyExperiment = async (id) => {
@@ -61,25 +62,25 @@ export const deleteDailyExperiment = async (id) => {
   `, id);
 };
 
-export const createExperiment = async (title, description, creation_date) => {
+export const createExperiment = async (project_id, title, objective, animals_description, additional_info, creation_date) => {
   const db = await getDatabase();
 
   const result = await db.run(`
-    INSERT INTO Experiment (title, description, creation_date)
-    VALUES (?, ?, ?)
-  `, title, description, creation_date);
+    INSERT INTO Experiment (project_id, title, objective, animals_description, additional_info, creation_date)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `, project_id, title, objective, animals_description, additional_info, creation_date);
   
   return result.lastID;
 };
 
-export const updateExperiment = async (id, title, description, creation_date) => {
+export const updateExperiment = async (id, project_id, title, objective, animals_description, additional_info, creation_date) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE Experiment
-    SET title = ?, description = ?, creation_date = ?
+    SET project_id = ?, title = ?, objective = ?, animals_description = ?, additional_info = ?, creation_date = ?
     WHERE id = ?
-  `, title, description, creation_date, id);
+  `, project_id, title, objective, animals_description, additional_info, creation_date, id);
 };
 
 export const deleteExperiment = async (id) => {
@@ -94,6 +95,12 @@ export const deleteExperiment = async (id) => {
       DELETE FROM Daily_Experiment
       WHERE experiment_id = ?
     `, id);
+
+    // Remove associated cages
+    const cages = await getCagesForExperiment(id);
+    for (let cage of cages) {
+      await deleteCageNoTransaction(cage.id);
+    }
 
     await db.run(`
       DELETE FROM Experiment
@@ -139,25 +146,25 @@ export const deleteTrial = async (id) => {
   `, id);
 };
 
-export const createTrialLine = async (mouse_id, trial_id, duration, mouse_order) => {
+export const createTrialLine = async (mouse_id, trial_id, duration_sec, mouse_order) => {
   const db = await getDatabase();
   
   const result = await db.run(`
-    INSERT INTO Trial_line (mouse_id, trial_id, duration, mouse_order)
+    INSERT INTO Trial_line (mouse_id, trial_id, duration_sec, mouse_order)
     VALUES (?, ?, ?, ?)
-  `, mouse_id, trial_id, duration, mouse_order);
+  `, mouse_id, trial_id, duration_sec, mouse_order);
   
   return result.lastID;
 };
 
-export const updateTrialLine = async (mouse_id, trial_id, duration, mouse_order) => {
+export const updateTrialLine = async (mouse_id, trial_id, duration_sec, mouse_order) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE Trial_line
-    SET duration = ?, mouse_order = ?
+    SET duration_sec = ?, mouse_order = ?
     WHERE mouse_id = ? AND trial_id = ?
-  `, duration, mouse_order, mouse_id, trial_id);
+  `, duration_sec, mouse_order, mouse_id, trial_id);
 };
 
 export const deleteTrialLine = async (mouse_id, trial_id) => {
@@ -238,8 +245,11 @@ export const getExperimentFull = async (experimentId) => {
     dailyExperimentsFull.push(dailyExperimentFull);
   }
 
+  const cages = await getCagesForExperiment(experimentId)
+
   return {
     ...experiment,
-    dailyExperiments: dailyExperimentsFull,
+    cages: cages,
+    dailyExperiments: dailyExperimentsFull
   };
 };

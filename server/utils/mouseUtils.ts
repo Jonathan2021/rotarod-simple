@@ -20,25 +20,25 @@ const getMice = async () => {
   return await db.all(`SELECT * FROM Mouse`);
 };
 
-export const createMouseGroupFamily = async (name) => {
+export const createMouseGroupFamily = async (title, description) => {
   const db = await getDatabase();
 
   const result = await db.run(`
-    INSERT INTO Mouse_Group_Family (name)
-    VALUES (?)
-  `, name);
+    INSERT INTO Mouse_Group_Family (title, description)
+    VALUES (?, ?)
+  `, title, description);
 
   return result.lastID;
 };
 
-export const updateMouseGroupFamily = async (id, name) => {
+export const updateMouseGroupFamily = async (id, title, description) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE Mouse_Group_Family
-    SET name = ?
+    SET title = ?, description = ?
     WHERE id = ?
-  `, name, id);
+  `, title, description, id);
 };
 
 export const deleteMouseGroupFamily = async (id) => {
@@ -56,25 +56,25 @@ export const deleteMouseGroupFamily = async (id) => {
   `, id);
 };
 
-export const createMouseGroup = async (groupFamilyId, precision) => {
+export const createMouseGroup = async (groupFamilyId, title, description) => {
   const db = await getDatabase();
 
   const result = await db.run(`
-    INSERT INTO Mouse_Group (group_family_id, precision)
-    VALUES (?, ?)
-  `, groupFamilyId, precision);
+    INSERT INTO Mouse_Group (group_family_id, title, description)
+    VALUES (?, ?, ?)
+  `, groupFamilyId, title, description);
 
   return result.lastID;
 };
 
-export const updateMouseGroup = async (id, groupFamilyId, precision) => {
+export const updateMouseGroup = async (id, groupFamilyId, title, description) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE Mouse_Group
-    SET group_family_id = ?, precision = ?
+    SET group_family_id = ?, title = ?, description = ?
     WHERE id = ?
-  `, groupFamilyId, precision, id);
+  `, groupFamilyId, title, description, id);
 };
 
 export const deleteMouseGroup = async (id) => {
@@ -92,25 +92,25 @@ export const deleteMouseGroup = async (id) => {
   `, id);
 };
 
-export const createMouse = async (groupId) => {
+export const createMouse = async (studyId, groupId) => {
   const db = await getDatabase();
 
   const result = await db.run(`
-    INSERT INTO Mouse (group_id)
-    VALUES (?)
-  `, groupId);
+    INSERT INTO Mouse (study_id, group_id)
+    VALUES (?, ?)
+  `, studyId, groupId);
 
   return result.lastID;
 };
 
-export const updateMouse = async (id, groupId) => {
+export const updateMouse = async (id, studyId, groupId) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE Mouse
-    SET group_id = ?
+    SET study_id = ?, group_id = ?
     WHERE id = ?
-  `, groupId, id);
+  `, studyId, groupId, id);
 };
 
 export const deleteMouse = async (id) => {
@@ -127,10 +127,13 @@ export const getMiceFull = async () => {
 
   const mice = await db.all(`
     SELECT Mouse.id as mouseId, Mouse_Group.id as groupId, Mouse_Group_Family.id as familyId,
-    Mouse_Group_Family.name as familyName, Mouse_Group.precision as groupPrecision
+    Mouse_Group_Family.title as familyTitle, Mouse_Group_Family.description as familyDescription, 
+    Mouse_Group.title as groupTitle, Mouse_Group.description as groupDescription,
+    Study.id as studyId, Study.title as studyTitle, Study.description as studyDescription
     FROM Mouse
     LEFT JOIN Mouse_Group ON Mouse.group_id = Mouse_Group.id
     LEFT JOIN Mouse_Group_Family ON Mouse_Group.group_family_id = Mouse_Group_Family.id
+    LEFT JOIN Study ON Mouse.study_id = Study.id
   `);
 
   return mice;
