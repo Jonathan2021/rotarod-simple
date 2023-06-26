@@ -1,26 +1,47 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Experiment</title>
-    <script src="/assets/js/experiment.js" defer></script>
-  </head>
-  <body>
-    <h1>Experiment</h1>
-    <p>Experiment ID: <span id="experimentId"><%= experimentId %></span></p>
+<head>
+  <title><%= title %></title>
+  <!-- include jqwidgets CSS and JavaScript files here -->
+</head>
+<body>
 
-    <table id="cagesTable">
-      <thead>
-        <tr>
-          <th>Cage Number</th>
-          <th>Mouse IDs</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Rows will be populated dynamically -->
-      </tbody>
-    </table>
+  <form method="post" action="/experiments/update">
+    <div>
+      <label>Title:</label>
+      <input type="text" name="title" value="<%= experiment.title %>" class="jqwidgets-input">
+    </div>
 
-    <button id="addCageBtn">Add Cage</button>
-  </body>
+    <div>
+      <label>Objective:</label>
+      <input type="text" name="objective" value="<%= experiment.objective %>" class="jqwidgets-input">
+    </div>
+
+    <div>
+      <label>Animals Description:</label>
+      <input type="text" name="animals_description" value="<%= experiment.animals_description %>" class="jqwidgets-input">
+    </div>
+
+    <div>
+      <label>Additional Info:</label>
+      <input type="text" name="additional_info" value="<%= experiment.additional_info %>" class="jqwidgets-input">
+    </div>
+
+    <div>
+      <label>Creation Date:</label>
+      <input type="text" name="creation_date" value="<%= new Date(experiment.creation_date).toLocaleDateString() %>" readonly>
+    </div>
+
+    <div id="cages-grid">
+      <!-- JQWidgets grid for cages to be added here -->
+    </div>
+
+    <div id="dailyExperiments-grid">
+      <!-- JQWidgets grid for dailyExperiments to be added here -->
+    </div>
+
+    <button type="submit" class="jqwidgets-button">Save Changes</button>
+  </form>
+
+</body>
 </html>
