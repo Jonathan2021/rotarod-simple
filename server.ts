@@ -2,11 +2,11 @@ import session from 'express-session';
 import express from 'express';
 import path from 'path';
 import { setUserAuth, getUserAcc } from './server/controllers/auth';
-import { getCagesForExperiment, addCageToExperiment } from './server/utils/cageUtils';
 import fs from 'fs';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 
+import { getGroups, getGroup, createGroup, updateGroup, deleteGroup } from './server/utils'
 
 declare module 'express-session' {
   export interface SessionData {
@@ -91,6 +91,43 @@ app.get('/', (req, res) => {
   }
 });
 
+app.get('/groups_data', async (req, res) => {
+  const groups = await getGroups();
+  res.json(groups);
+});
+
+app.get('/groups', async (req, res) => {
+  const groups = await getGroups();
+  res.render('groups', { groups });
+});
+
+app.post('/groups', async (req, res) => {
+  const { title, description } = req.body;
+  const id = await createGroup(title, description);
+  res.json({ id });
+});
+
+app.put('/groups/:id', async (req, res) => {
+  const { title, description } = req.body;
+  await updateGroup(req.params.id, title, description);
+  res.json({ success: true });
+});
+
+app.delete('/groups/:id', async (req, res) => {
+  await deleteGroup(req.params.id);
+  res.json({ success: true });
+});
+
+app.get('/group_form', (req, res) => {
+  res.render('group_form', {group: null});
+});
+
+app.get('/group_form/:id', async (req, res) => {
+  const group = await getGroup(req.params.id); // Assuming you have this function to get a single group
+  res.render('group_form', { group: group });
+});
+
+/*
 app.post('/experiment/new', async (req, res) => {
   const db = await open({
     filename: path.join(__dirname, 'server', 'database', 'myDatabase.db'),
@@ -107,8 +144,10 @@ app.post('/experiment/new', async (req, res) => {
 
 app.get('/experiment/:id', (req, res) => {
   // Render the experiment page with the given ID
-  res.render('experiment', { experimentId: req.params.id });
+  const full_exp = getExperimentFull(req.params.id)
+  res.render('experiment', full_exp);
 });
+
 
 app.get('/api/experiment/:id/cages', async (req, res) => {
   const experimentId = req.params.id;
@@ -130,7 +169,7 @@ app.get('/api/experiment/:id/cages', async (req, res) => {
 
   res.json(cages);
 });
-
+*/
 app.listen(port, function () {
   console.log('App is listening on port ' + port);
 });

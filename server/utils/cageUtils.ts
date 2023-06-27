@@ -7,9 +7,8 @@ export const getCagesForExperiment = async (experimentId) => {
   const cages = await db.all(`
     SELECT Cage.id, Cage.cage_nb, GROUP_CONCAT(Mouse_Cage.mouse_id) as mice
     FROM Cage
-    INNER JOIN Cage_Experiment ON Cage.id = Cage_Experiment.cage_id
     LEFT JOIN Mouse_Cage ON Cage.id = Mouse_Cage.cage_id
-    WHERE Cage_Experiment.experiment_id = ?
+    WHERE Cage.experiment_id = ?
     GROUP BY Cage.id
   `, experimentId);
 
@@ -21,7 +20,9 @@ export const getCagesForExperiment = async (experimentId) => {
   return cages;
 };
 
-export const addMiceToCage = async (cageId, mouseIds, db) => {
+export const addMiceToCage = async (cageId, mouseIds) => {
+  const db = await getDatabase();
+  
   // Link the mice to the new cage
   for (let mouseId of mouseIds) {
     await db.run(`
@@ -40,17 +41,12 @@ export const addCageToExperiment = async (cageNb, experimentId, mouseIds) => {
   try {
     // Insert the new cage and link it to the experiment
     const cageResult = await db.run(`
-      INSERT INTO Cage (cage_nb)
-      VALUES (?)
-    `, cageNb);
-
-    await db.run(`
-      INSERT INTO Cage_Experiment (cage_id, experiment_id)
+      INSERT INTO Cage (cage_nb, experiment_id)
       VALUES (?, ?)
-    `, cageResult.lastID, experimentId);
+    `, cageNb, experimentId);
 
     // Add the mice to the new cage
-    await addMiceToCage(cageResult.lastID, mouseIds, db);
+    await addMiceToCage(cageResult.lastID, mouseIds);
 
     // Commit the transaction if everything went well
     await db.run('COMMIT');
@@ -69,7 +65,7 @@ export const updateCage = async (cageId, cageNb, mouseIds) => {
   await db.run('BEGIN TRANSACTION');
 
   try {
-    // Update the cage number and its experiment association
+    // Update the cage number
     await db.run(`
       UPDATE Cage
       SET cage_nb = ?
@@ -83,7 +79,7 @@ export const updateCage = async (cageId, cageNb, mouseIds) => {
     `, cageId);
 
     // Add the new set of mice to the cage
-    await addMiceToCage(cageId, mouseIds, db);
+    await addMiceToCage(cageId, mouseIds);
 
     // Commit the transaction if everything went well
     await db.run('COMMIT');
@@ -94,26 +90,6 @@ export const updateCage = async (cageId, cageNb, mouseIds) => {
   }
 };
 
-export const deleteCageNoTransaction = async (cageId) => {
-  const db = await getDatabase();
-  
-  // Delete the cage and its associations with mice and experiments
-  await db.run(`
-    DELETE FROM Mouse_Cage
-    WHERE cage_id = ?
-  `, cageId);
-
-  await db.run(`
-    DELETE FROM Cage_Experiment
-    WHERE cage_id = ?
-  `, cageId);
-
-  await db.run(`
-    DELETE FROM Cage
-    WHERE id = ?
-  `, cageId);
-};
-
 export const deleteCage = async (cageId) => {
   const db = await getDatabase();
 
@@ -121,10 +97,19 @@ export const deleteCage = async (cageId) => {
   await db.run('BEGIN TRANSACTION');
 
   try {
-    await deleteCageNoTransaction(cageId);
+    // Delete the cage and its associations with mice
+    await db.run(`
+      DELETE FROM Mouse_Cage
+      WHERE cage_id = ?
+    `, cageId);
 
-    // Commit the transaction if everything went well
-    await db.run('COMMIT');
+  await db.run(`
+    DELETE FROM Cage
+    WHERE id = ?
+  `, cageId);
+
+  // Commit the transaction if everything went well
+  await db.run('COMMIT');
   } catch (err) {
     // If something went wrong, rollback the transaction
     await db.run('ROLLBACK');

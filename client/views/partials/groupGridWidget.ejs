@@ -1,0 +1,86 @@
+  <div class="grid-container">
+    <input type="button" value="Add new" id="addBtnGroup" class="grid-button"/>
+    <input type="button" value="Update" id="updateBtnGroup" class="grid-button" disabled />
+    <input type="button" value="Delete" id="deleteBtnGroup" class="grid-button" disabled />
+    <div id="jqxGridGroup"></div>
+  </div>
+  <script>
+  $(document).ready(function () {
+    let source = {
+      localdata: [],
+      datafields: [{ name: 'title' }, { name: 'id' }, {name: 'description'}],
+      datatype: "json"
+    };
+    let dataAdapter = new $.jqx.dataAdapter(source);
+
+    $("#jqxGridGroup").jqxGrid({
+      width: 600,
+      source: dataAdapter,
+      sortable: true,
+      filterable: true,
+      showfilterrow: true,
+      columns: [
+        { text: 'Title', datafield: 'title' },
+        { text: 'Description', datafield: 'description' }
+      ],
+      selectionmode: 'checkbox'
+    });
+   
+    let refreshGrid = function() {
+      $.ajax({
+        url: "/groups_data",
+        type: "GET",
+        success: function (data) {
+          source.localdata = data;
+          $("#jqxGridGroup").jqxGrid('updatebounddata');
+        }
+      });
+    };
+
+    refreshGrid(); // Populate the table initially
+
+    window.addEventListener('storage', function (e) {
+    // Check if the 'groupChange' item in localStorage has changed
+    if (e.key === 'groupChange') {
+      refreshGrid();
+    }
+    });
+
+    $('#jqxGridGroup').on('rowselect', function (event) {
+      let selectedIndexes = $('#jqxGridGroup').jqxGrid('selectedrowindexes');
+      if (selectedIndexes.length > 0) {
+        $('#updateBtnGroup, #deleteBtnGroup').removeAttr('disabled');
+      } else {
+        $('#updateBtnGroup, #deleteBtnGroup').attr('disabled', 'disabled');
+      }
+    });
+
+    $('#addBtnGroup').click(function () {
+      console.log("Click on add")
+      window.open('/group_form', 'Add New Group', 'width=500,height=300');
+    });
+
+    $('#updateBtnGroup').click(function () {
+      let selectedIndexes = $('#jqxGridGroup').jqxGrid('selectedrowindexes');
+      selectedIndexes.forEach(function (index) {
+        let dataRecord = $('#jqxGridGroup').jqxGrid('getrowdata', index);
+        window.open('/group_form/' + dataRecord.id, 'Update Group ' + dataRecord.id, 'width=500,height=300');
+      });
+    });
+
+    $('#deleteBtnGroup').click(function () {
+      let selectedIndexes = $('#jqxGridGroup').jqxGrid('selectedrowindexes');
+      selectedIndexes.forEach(function (index) {
+        let dataRecord = $('#jqxGridGroup').jqxGrid('getrowdata', index);
+        $.ajax({
+          url: '/groups/' + dataRecord.id,
+          type: 'DELETE',
+          success: function () {
+            $('#jqxGridGroup').jqxGrid('deleterow', index);
+          }
+        });
+      });
+      $('#updateBtnGroup, #deleteBtnGroup').attr('disabled', 'disabled');
+    });
+  });
+  </script>
