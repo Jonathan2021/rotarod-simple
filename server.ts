@@ -6,7 +6,11 @@ import fs from 'fs';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 
-import { getGroups, getGroup, createGroup, updateGroup, deleteGroup } from './server/utils'
+import {
+  isUniqueConstraintError,
+  getGroups, getGroup, createGroup, updateGroup, deleteGroup,
+  getEthicalProjects, getEthicalProject, createEthicalProject, updateEthicalProject, deleteEthicalProject, findEthicalProject
+} from './server/utils'
 
 declare module 'express-session' {
   export interface SessionData {
@@ -97,8 +101,7 @@ app.get('/groups_data', async (req, res) => {
 });
 
 app.get('/groups', async (req, res) => {
-  const groups = await getGroups();
-  res.render('groups', { groups });
+  res.render('widgetStandalone', { partial: 'partials/groupGridWidget.ejs' });
 });
 
 app.post('/groups', async (req, res) => {
@@ -123,8 +126,60 @@ app.get('/group_form', (req, res) => {
 });
 
 app.get('/group_form/:id', async (req, res) => {
-  const group = await getGroup(req.params.id); // Assuming you have this function to get a single group
+  const group = await getGroup(req.params.id);
   res.render('group_form', { group: group });
+});
+
+app.get('/projects_data', async (req, res) => {
+  const projects = await getEthicalProjects();
+  console.log("Projects : ", projects);
+  res.json(projects);
+});
+
+app.get('/projects', async (req, res) => {
+  res.render('widgetStandalone', { partial: 'partials/ethicalProjectWidget.ejs'});
+});
+
+
+app.post('/projects', async (req, res) => {
+  const { title } = req.body;
+  try {
+    const id = await createEthicalProject(title);
+    res.json({ id });
+  } catch (err) {
+    console.log(err);
+    // Assuming err is a unique constraint violation error. Please replace this check with the appropriate one for your database/ORM.
+    if (isUniqueConstraintError(err)) {
+      const existingRecord = await findEthicalProject(title);
+      res.status(409).json({ error: 'A project with this title already exists.', id: existingRecord.id }); // HTTP status 409: Conflict
+    } else {
+      res.status(500).json({ error: 'An error occurred while creating the project.' }); // HTTP status 500: Internal Server Error
+    }
+  }
+});
+
+app.put('/projects/:id', async (req, res) => {
+  const { title } = req.body;
+  try {
+    await updateEthicalProject(req.params.id, title);
+    res.json({ success: true });
+  } catch (err) {
+    if (isUniqueConstraintError(err)) {
+      const existingRecord = await findEthicalProject(title);
+      res.status(409).json({ error: 'A project with this title already exists.' , id : existingRecord.id}); // HTTP status 409: Conflict
+    } else {
+      res.status(500).json({ error: err.message }); // HTTP status 500: Internal Server Error
+    }
+  }
+});
+
+app.delete('/projects/:id', async (req, res) => {
+  try {
+    await deleteEthicalProject(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message }); // HTTP status 500: Internal Server Error
+  }
 });
 
 /*

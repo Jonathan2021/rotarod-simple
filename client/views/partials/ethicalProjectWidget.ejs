@@ -1,0 +1,132 @@
+<div class="dropdown-container">
+  <input type="button" value="Add new" id="addBtnProject" class="dropdown-button" disabled/>
+  <input type="button" value="Update" id="updateBtnProject" class="dropdown-button" disabled />
+  <input type="button" value="Delete" id="deleteBtnProject" class="dropdown-button" disabled />
+  <div id="errorMsg" class="error-message"></div>
+  <div id="jqxComboBoxProject" class="dropdown"></div>
+</div>
+<script>
+$(document).ready(function () {
+
+  let projectChangeEvent = function(detail=null) { return new CustomEvent('projectChange', {detail: detail}); }
+
+  let source = {
+    localdata: [],
+    datatype: "json"
+  };
+  let dataAdapter = new $.jqx.dataAdapter(source);
+
+  $("#jqxComboBoxProject").jqxComboBox({
+    autoComplete: true,
+    searchMode: 'containsignorecase',
+    source: dataAdapter,
+    displayMember: "title",
+    valueMember: "id",
+    //filterable: true,
+    width: 200,
+    height: 25,
+    autoDropDownHeight: true,
+    //theme: 'metro'
+  });
+  
+    $("#jqxComboBoxProject").on('keyup', function () {
+    const title = $(this).jqxComboBox('input').val();
+    if (title) {
+      $('#addBtnProject').removeAttr('disabled');
+    } else {
+      $('#addBtnProject').attr('disabled', 'disabled');
+    }
+  });
+
+   let refreshComboBox = function(selectedItemId) {
+    $.ajax({
+      url: "/projects_data",
+      type: "GET",
+      success: function (data) {
+        console.log(data);
+        source.localdata = data;
+        dataAdapter = new $.jqx.dataAdapter(source); // Update the data adapter source
+        $("#jqxComboBoxProject").jqxComboBox({source: dataAdapter}); // Update the jqxComboBox source
+        if(selectedItemId){
+          $('#jqxComboBoxProject').jqxComboBox('selectItem', selectedItemId);
+        }
+      }
+    });
+  };
+
+  window.addEventListener('projectChange', function (e) {
+    refreshComboBox(e.detail);
+  });
+
+  window.dispatchEvent(projectChangeEvent());
+
+  $('#jqxComboBoxProject').on('select', function (event) {
+    if (event.args) {
+      $('#updateBtnProject, #deleteBtnProject').removeAttr('disabled');
+    } else {
+      $('#updateBtnProject, #deleteBtnProject').attr('disabled', 'disabled');
+    }
+  });
+ 
+  let onsuccess = function (data = null) {
+    let id = data ? data.id : null;
+    $('#errorMsg').hide();
+    window.dispatchEvent(projectChangeEvent(id));
+
+  };
+
+  $('#addBtnProject').click(function () {
+    let title = $("#jqxComboBoxProject").jqxComboBox('input').val();
+    if (!title) return;
+  
+    $.ajax({
+        url: '/projects',
+        type: 'POST',
+        data: { title },
+        success: onsuccess,
+        error: function (jqXHR) {
+        let json = JSON.parse(jqXHR.responseText)
+        let errorMessage = json.error;
+        $('#errorMsg').text(errorMessage).show();
+        if (jqXHR.status === 409) { // HTTP status 409: Conflict
+            window.dispatchEvent(projectChangeEvent(json.id));
+        }
+        }
+    });
+  });
+
+  $('#updateBtnProject').click(function () {
+    let selectedItem = $('#jqxComboBoxProject').jqxComboBox('getSelectedItem');
+    let newTitle = prompt("Please enter new title for the project:");
+    if (newTitle != null) {
+        $.ajax({
+        url: '/projects/' + selectedItem.value,
+        type: 'PUT',
+        data: { title: newTitle },
+        success: onsuccess,
+        error: function (jqXHR) {
+            let json = JSON.parse(jqXHR.responseText)
+            let errorMessage = json.error;
+            $('#errorMsg').text(errorMessage).show();
+            if (jqXHR.status === 409) { // HTTP status 409: Conflict
+                window.dispatchEvent(projectChangeEvent(json.id));
+            } 
+        }
+        });
+    }
+  });
+
+  $('#deleteBtnProject').click(function () {
+    let selectedItem = $('#jqxComboBoxProject').jqxComboBox('getSelectedItem');
+    $.ajax({
+      url: '/projects/' + selectedItem.value,
+      type: 'DELETE',
+      success: function () {
+        $('#jqxComboBoxProject').jqxComboBox('removeItem', selectedItem);
+        $('#errorMsg').hide();
+      }
+    });
+    $('#updateBtnProject, #deleteBtnProject').attr('disabled', 'disabled');
+  });
+});
+</script>

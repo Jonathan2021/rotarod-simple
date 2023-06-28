@@ -108,28 +108,10 @@ export const deleteDailyExperiment = async (id) => {
 export const deleteExperiment = async (id) => {
   const db = await getDatabase();
 
-  // Begin a database transaction
-  await db.run('BEGIN TRANSACTION');
-
-  try {
-    // Delete the experiment and its associations with daily experiments
-    await db.run(`
-      DELETE FROM Daily_Experiment
-      WHERE experiment_id = ?
-    `, id);
-
     await db.run(`
       DELETE FROM Experiment
       WHERE id = ?
     `, id);
-
-    // Commit the transaction if everything went well
-    await db.run('COMMIT');
-  } catch (err) {
-    // If something went wrong, rollback the transaction
-    await db.run('ROLLBACK');
-    throw err;
-  }
 };
 
 export const createTrial = async (daily_experiment_id, time) => {

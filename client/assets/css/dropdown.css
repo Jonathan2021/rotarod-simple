@@ -1,0 +1,30 @@
+.dropdown-container {
+    width: 700px;
+    margin: 0 auto;
+    margin-top: 10%;
+}
+
+.dropdown-button {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+}
+
+.dropdown-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.dropdown-button:hover {
+    background-color: #45a049;
+}
+
+.dropdown {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}

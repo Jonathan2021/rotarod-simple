@@ -1,7 +1,7 @@
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import path from 'path';
-import { getDatabase } from './utils/databaseUtils';
+import { getDatabase } from './utils';
 
 (async () => {
   // Open the database connection
@@ -18,13 +18,13 @@ import { getDatabase } from './utils/databaseUtils';
   await db.run(`
     CREATE TABLE "Ethical_Project" (
     "id" integer PRIMARY KEY,
-    "title" integer
+    "title" integer UNIQUE
     )`);
 
   await db.run(`
     CREATE TABLE "Ethical_Experiment" (
     "id" integer PRIMARY KEY,
-    "title" varchar
+    "title" varchar UNIQUE
     )`);
 
   await db.run(`
@@ -32,7 +32,7 @@ import { getDatabase } from './utils/databaseUtils';
     "id" integer PRIMARY KEY,
     "eth_project_id" integer,
     "eth_exp_id" integer,
-    "title" varchar,
+    "title" varchar UNIQUE,
     "objective" varchar,
     FOREIGN KEY ("eth_project_id") REFERENCES "Ethical_Project" ("id"),
     FOREIGN KEY ("eth_exp_id") REFERENCES "Ethical_Experiment" ("id")
@@ -58,7 +58,7 @@ import { getDatabase } from './utils/databaseUtils';
   await db.run(`
     CREATE TABLE "Place" (
     "id" integer PRIMARY KEY,
-    "title" integer
+    "title" integer UNIQUE
     )`);
 
   await db.run(`
@@ -112,6 +112,8 @@ import { getDatabase } from './utils/databaseUtils';
     "firstname" varchar,
     "surname" varchar
     )`);
+  
+    await db.run(`Create UNIQUE INDEX "experimentator_index" ON "Experimentator" ("firstname", "surname")`);
 
   await db.run(`
     CREATE TABLE "Daily_Experiment" (
@@ -132,9 +134,12 @@ import { getDatabase } from './utils/databaseUtils';
     "daily_experiment_id" integer,
     "cage_experiment_id" integer,
     "order" integer,
+    PRIMARY KEY ("daily_experiment_id", "cage_experiment_id"),
     FOREIGN KEY ("daily_experiment_id") REFERENCES "Daily_Experiment" ("id"),
     FOREIGN KEY ("cage_experiment_id") REFERENCES "Cage_Experiment" ("id")
     )`);
+    
+    await db.run(`Create UNIQUE INDEX "daily_cage_order_index" ON "Daily_Cage_Order" ("daily_experiment_id", "order")`);
 
   await db.run(`
     CREATE TABLE "Daily_Experimentator" (
@@ -190,6 +195,12 @@ import { getDatabase } from './utils/databaseUtils';
     END;
   END;
 `);
+
+  // Adding stuff in
+  await db.run(`
+    INSERT INTO "Ethical_Project" (title)
+    VALUES (?)
+  `, "Project1");
 
   console.log('Database and tables created successfully');
 })();
