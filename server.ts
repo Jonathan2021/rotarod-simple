@@ -9,7 +9,8 @@ import sqlite3 from 'sqlite3';
 import {
   isUniqueConstraintError,
   getGroups, getGroup, createGroup, updateGroup, deleteGroup,
-  getEthicalProjects, getEthicalProject, createEthicalProject, updateEthicalProject, deleteEthicalProject, findEthicalProject
+  getEthicalProjects, getEthicalProject, createEthicalProject, updateEthicalProject, deleteEthicalProject, findEthicalProject,
+  getEthicalExperimentsFromProject, createEthicalExperiment, updateEthicalExperiment, deleteEthicalExperiment, findEthicalExperiment, getEthicalExperiments
 } from './server/utils'
 
 declare module 'express-session' {
@@ -137,7 +138,7 @@ app.get('/projects_data', async (req, res) => {
 });
 
 app.get('/projects', async (req, res) => {
-  res.render('widgetStandalone', { partial: 'partials/ethicalProjectWidget.ejs'});
+  res.render('widgetStandalone', { partial: 'partials/ethicalWidget.ejs'});
 });
 
 
@@ -181,6 +182,61 @@ app.delete('/projects/:id', async (req, res) => {
     res.status(500).json({ error: err.message }); // HTTP status 500: Internal Server Error
   }
 });
+
+app.get('/experiments_data', async (req, res) => {
+  const experiments = await getEthicalExperiments();
+  console.log("Experiments : ", experiments);
+  res.json(experiments);
+});
+
+app.get('/projects/:eth_project_id/experiments_data', async (req, res) => {
+  const experiments = await getEthicalExperimentsFromProject(req.params.eth_project_id);
+  console.log("Experiments : ", experiments);
+  res.json(experiments);
+});
+
+app.post('/projects/:eth_project_id/experiments', async (req, res) => {
+  const { title } = req.body;
+
+  try {
+    const id = await createEthicalExperiment(req.params.eth_project_id, title);
+    res.json({ id });
+  } catch (err) {
+    console.log(err);
+    if (isUniqueConstraintError(err)) {
+      const existingRecord = await findEthicalExperiment(title);
+      res.status(409).json({ error: 'An experiment with this title already exists.', id: existingRecord.id }); // HTTP status 409: Conflict
+    } else {
+      res.status(500).json({ error: 'An error occurred while creating the experiment.' }); // HTTP status 500: Internal Server Error
+    }
+  }
+});
+
+app.put('/projects/:eth_project_id/experiments/:id', async (req, res) => {
+  const { title } = req.body;
+  try {
+    await updateEthicalExperiment(req.params.id, req.params.eth_project_id, title);
+    res.json({ success: true });
+  } catch (err) {
+    console.log(err);
+    if (isUniqueConstraintError(err)) {
+      const existingRecord = await findEthicalExperiment(title);
+      res.status(409).json({ error: 'An experiment with this title already exists.', id: existingRecord.id }); // HTTP status 409: Conflict
+    } else {
+      res.status(500).json({ error: err.message }); // HTTP status 500: Internal Server Error
+    }
+  }
+});
+
+app.delete('/projects/:eth_project_id/experiments/:id', async (req, res) => {
+  try {
+    await deleteEthicalExperiment(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message }); // HTTP status 500: Internal Server Error
+  }
+});
+
 
 /*
 app.post('/experiment/new', async (req, res) => {

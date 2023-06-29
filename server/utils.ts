@@ -133,25 +133,36 @@ export const getEthicalExperiment = async (id) => {
   return await db.get(`SELECT * FROM "Ethical_Experiment" WHERE id = ?`, id);
 };
 
-export const createEthicalExperiment = async (title) => {
+export const findEthicalExperiment = async (title) => {
+  const db = await getDatabase();
+  return await db.get('SELECT * FROM "Ethical_Experiment" WHERE title = ?', title);
+}
+
+export const getEthicalExperimentsFromProject = async(eth_project_id) => {
+  const db = await getDatabase();
+
+  return await db.all(`SELECT * FROM "Ethical_Experiment" WHERE eth_project_id = ?`, eth_project_id);
+}
+
+export const createEthicalExperiment = async (eth_project_id, title) => {
   const db = await getDatabase();
 
   const result = await db.run(`
-    INSERT INTO "Ethical_Experiment" (title)
-    VALUES (?)
-  `, title);
+    INSERT INTO "Ethical_Experiment" (eth_project_id, title)
+    VALUES (?, ?)
+  `, eth_project_id, title);
 
   return result.lastID;
 };
 
-export const updateEthicalExperiment = async (id, title) => {
+export const updateEthicalExperiment = async (id, eth_project_id, title) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE "Ethical_Experiment"
-    SET title = ?
+    SET eth_project_id = ?, title = ?
     WHERE id = ?
-  `, title, id);
+  `, eth_project_id, title, id);
 };
 
 export const deleteEthicalExperiment = async (id) => {

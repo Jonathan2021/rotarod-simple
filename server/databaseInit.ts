@@ -18,13 +18,15 @@ import { getDatabase } from './utils';
   await db.run(`
     CREATE TABLE "Ethical_Project" (
     "id" integer PRIMARY KEY,
-    "title" integer UNIQUE
+    "title" varchar UNIQUE
     )`);
 
   await db.run(`
     CREATE TABLE "Ethical_Experiment" (
     "id" integer PRIMARY KEY,
-    "title" varchar UNIQUE
+    "eth_project_id" integer,
+    "title" varchar UNIQUE,
+    FOREIGN KEY ("eth_project_id") REFERENCES "Ethical_Project" ("id") ON DELETE CASCADE
     )`);
 
   await db.run(`
@@ -196,11 +198,7 @@ import { getDatabase } from './utils';
   END;
 `);
 
-  // Adding stuff in
-  await db.run(`
-    INSERT INTO "Ethical_Project" (title)
-    VALUES (?)
-  `, "Project1");
+  // Insert stuff in tables here
 
   console.log('Database and tables created successfully');
 })();
