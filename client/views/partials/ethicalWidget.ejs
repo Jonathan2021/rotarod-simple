@@ -1,11 +1,12 @@
 <div class="dropdown-container">
+  <h2>Ethical Project</h2>
   <input type="button" value="Add new" id="addBtnProject" class="dropdown-button" disabled/>
   <input type="button" value="Update" id="updateBtnProject" class="dropdown-button" disabled />
   <input type="button" value="Delete" id="deleteBtnProject" class="dropdown-button" disabled />
   <div id="errorMsg" class="error-message"></div>
   <div id="jqxComboBoxProject" class="dropdown"></div>
-</div>
-<div class="dropdown-container">
+
+  <h2>Ethical Experiment</h2>
   <input type="button" value="Add new" id="addBtnEthExp" class="dropdown-button" disabled/>
   <input type="button" value="Update" id="updateBtnEthExp" class="dropdown-button" disabled />
   <input type="button" value="Delete" id="deleteBtnEthExp" class="dropdown-button" disabled />
@@ -49,8 +50,7 @@ $(document).ready(function () {
       $('#addBtnProject').attr('disabled', 'disabled');
     }
   });
-
-   let refreshComboBox = function(selectedItemId) {
+    let refreshComboBox = function(selectedItemId) {
     $.ajax({
       url: "/projects_data",
       type: "GET",
@@ -62,6 +62,7 @@ $(document).ready(function () {
         if(selectedItemId){
           $('#jqxComboBoxProject').jqxComboBox('selectItem', selectedItemId);
         }
+        window.dispatchEvent(new CustomEvent("projectsLoaded"));
       }
     });
   };
@@ -200,6 +201,7 @@ $(document).ready(function () {
         if(selectedExperimentId){
           $('#jqxComboBoxEthExp').jqxComboBox('selectItem', selectedExperimentId);
         }
+        window.dispatchEvent(new CustomEvent("ethExpLoaded"));
       }
     });
   };

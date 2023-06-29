@@ -10,7 +10,8 @@ import {
   isUniqueConstraintError,
   getGroups, getGroup, createGroup, updateGroup, deleteGroup,
   getEthicalProjects, getEthicalProject, createEthicalProject, updateEthicalProject, deleteEthicalProject, findEthicalProject,
-  getEthicalExperimentsFromProject, createEthicalExperiment, updateEthicalExperiment, deleteEthicalExperiment, findEthicalExperiment, getEthicalExperiments
+  getEthicalExperimentsFromProject, createEthicalExperiment, updateEthicalExperiment, deleteEthicalExperiment, findEthicalExperiment, getEthicalExperiments,
+  createStudy, updateStudy, findStudyByTitle, getStudy, deleteStudy
 } from './server/utils'
 
 declare module 'express-session' {
@@ -96,6 +97,8 @@ app.get('/', (req, res) => {
   }
 });
 
+// Groups
+
 app.get('/groups_data', async (req, res) => {
   const groups = await getGroups();
   res.json(groups);
@@ -130,6 +133,8 @@ app.get('/group_form/:id', async (req, res) => {
   const group = await getGroup(req.params.id);
   res.render('group_form', { group: group });
 });
+
+// Ethical projects
 
 app.get('/projects_data', async (req, res) => {
   const projects = await getEthicalProjects();
@@ -182,6 +187,8 @@ app.delete('/projects/:id', async (req, res) => {
     res.status(500).json({ error: err.message }); // HTTP status 500: Internal Server Error
   }
 });
+
+// Ethical Experiments
 
 app.get('/experiments_data', async (req, res) => {
   const experiments = await getEthicalExperiments();
@@ -237,6 +244,65 @@ app.delete('/projects/:eth_project_id/experiments/:id', async (req, res) => {
   }
 });
 
+app.post('/study', async (req, res) => {
+  const { title } = req.body;
+  
+  try {
+    const id = await createStudy(title);
+    res.json({ id });
+  } catch (err) {
+    console.log(err);
+    if (isUniqueConstraintError(err)) {
+      const existingRecord = await findStudyByTitle(title);
+      res.status(409).json({ error: 'A study with this title already exists.', id: existingRecord.id }); // HTTP status 409: Conflict
+    } else {
+      res.status(500).json({ error: 'An error occurred while creating the study.' }); // HTTP status 500: Internal Server Error
+    }
+  }
+});
+
+app.get('/study/:id/form', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const study = await getStudy(id);
+        if (!study) {
+            res.status(404).send('Study not found'); // HTTP status 404: Not Found
+        } else {
+            res.render('study_form', { study: study });
+        }
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('An error occurred while retrieving the study.'); // HTTP status 500: Internal Server Error
+    }
+});
+
+app.put('/study/:id', async (req, res) => {
+    const { title, objective, eth_project_id, eth_exp_id } = req.body;
+    console.log("Putting", req.body);
+
+    try {
+        const existingRecord = await findStudyByTitle(title);
+        if (existingRecord && existingRecord.id != req.params.id) {
+            res.status(409).json({ error: 'A study with this title already exists.' }); // HTTP status 409: Conflict
+        } else {
+            await updateStudy(req.params.id, eth_project_id, eth_exp_id, title, objective);
+            res.json({ message: 'Study updated successfully' });
+        }
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: 'An error occurred while updating the study.' }); // HTTP status 500: Internal Server Error
+    }
+});
+
+app.delete('/study/:id', async (req, res) => {
+    try {
+        await deleteStudy(req.params.id);
+        res.json({ message: 'Study deleted successfully' });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: 'An error occurred while deleting the study.' });
+    }
+});
 
 /*
 app.post('/experiment/new', async (req, res) => {

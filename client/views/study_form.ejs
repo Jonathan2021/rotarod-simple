@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Study Form</title>
+    <link rel="stylesheet" href="https://jqwidgets.com/public/jqwidgets/styles/jqx.base.css">
+    <link rel="stylesheet" href="https://jqwidgets.com/public/jqwidgets/styles/jqx.metro.css">
+    <link rel="stylesheet" href="/assets/css/grid.css">
+    <link rel="stylesheet" href="/assets/css/dropdown.css">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://jqwidgets.com/public/jqwidgets/jqx-all.js"></script>
+
+</head>
+<body>
+    <%- include('partials/ethicalWidget.ejs') %>
+    <form id="study-form">
+        <label for="title">Title:</label><br>
+        <input type="text" id="title" name="title" value="<%= study.title %>"><br>
+        <label for="objective">Objective:</label><br>
+        <input type="text" id="objective" name="objective" value="<%= study.objective %>"><br>
+        <input type="submit" value="Save">
+        <input type="button" id="delete-study" value="Delete">
+    </form>
+    <%- include('partials/batchWidget.ejs') %>
+    <script type="text/javascript">
+        // Your form processing code goes here.
+        // This script runs when the page is fully loaded.
+        $(document).ready(function() {
+            let ethProjectId = "<%= study.eth_project_id %>";
+            let ethExpId = "<%= study.eth_exp_id %>";
+            console.log(ethProjectId);
+            console.log(ethExpId);
+
+            // If the values are not null, set the selected item of the jqxComboBoxes
+            if (ethProjectId !== "") {
+                var isFirstProj = true;
+                window.addEventListener("projectsLoaded", function (e) {
+                    if (isFirstProj)
+                    { $("#jqxComboBoxProject").jqxComboBox('selectItem', parseInt(ethProjectId)) };
+                    isFirstProj = false;
+                });
+                
+                if (ethExpId !== "") {
+                    var isFirstExp = true;
+                    window.addEventListener("ethExpLoaded", function (e) {
+                        if (isFirstExp)
+                        { $("#jqxComboBoxEthExp").jqxComboBox('selectItem', parseInt(ethExpId)) };
+                        isFirstExp = false;
+                    });
+                }
+            }
+
+            // Add a submit event handler to the form
+            $('#study-form').on('submit', function(event) {
+                event.preventDefault(); // Prevent the form from being submitted normally
+
+                // Validate the form fields
+                let title = $('#title').val();
+                let objective = $('#objective').val();
+                let ethProjectId = $("#jqxComboBoxProject").jqxComboBox('getSelectedItem');
+                let ethExpId = $("#jqxComboBoxEthExp").jqxComboBox('getSelectedItem');
+
+                if (!title) {
+                    alert("Title cannot be empty!");
+                    return;
+                }
+
+                if (!ethProjectId || !ethExpId) {
+                    alert("Please select a project and experiment!");
+                    return;
+                }
+                
+                console.log(title);
+                console.log(objective);
+                console.log(ethProjectId);
+                console.log(ethExpId);
+                // Send an AJAX request to update the study
+                $.ajax({
+                    url: '/study/' + "<%= study.id %>",
+                    type: 'PUT',
+                    data: {
+                        title: title,
+                        objective: objective,
+                        eth_project_id: ethProjectId.value,
+                        eth_exp_id: ethExpId.value
+                    },
+                    success: function(data) {
+                        alert("Study updated successfully!");
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        let response = JSON.parse(jqXHR.responseText);
+                        alert('Error updating study: ' + response.error);
+                    }
+                });
+            });
+
+            $('#delete-study').on('click', function() {
+                if (!confirm("Are you sure you want to delete this study?")) {
+                    return;
+                }
+
+                // Send an AJAX request to delete the study
+                $.ajax({
+                    url: '/study/' + "<%= study.id %>",
+                    type: 'DELETE',
+                    success: function(data) {
+                        alert("Study deleted successfully!");
+                        window.location.href = "/main.html";
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        let response = JSON.parse(jqXHR.responseText);
+                        alert('Error deleting study: ' + response.error);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

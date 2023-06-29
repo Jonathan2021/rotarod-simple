@@ -187,7 +187,12 @@ export const getStudy = async (id) => {
   return await db.get(`SELECT * FROM "Study" WHERE id = ?`, id);
 };
 
-export const createStudy = async (ethProjectId, ethExpId, title, objective) => {
+export const findStudyByTitle = async (title) => {
+  const db = await getDatabase();
+  return await db.get(`SELECT * FROM "Study" WHERE title = ?`, title);
+};
+
+export const createStudy = async (title, ethProjectId=null, ethExpId=null, objective=null) => {
   const db = await getDatabase();
 
   const result = await db.run(`

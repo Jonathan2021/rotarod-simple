@@ -46,7 +46,7 @@ import { getDatabase } from './utils';
     "batch_nb" integer,
     "description" varchar,
     PRIMARY KEY ("study_id", "batch_nb"),
-    FOREIGN KEY ("study_id") REFERENCES "Study" ("id")
+    FOREIGN KEY ("study_id") REFERENCES "Study" ("id") ON DELETE CASCADE
     )`);
 
   await db.run(`
