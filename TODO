@@ -3,3 +3,7 @@ Don't forget to replace 'http://localhost:3000/auth/login' with your actual serv
 call closeDatabase function in an appropriate place in your application, such as a shutdown or cleanup hook.:
 Download Jquery and jwidget scripts and move them to a folder. Change paths everywhere needed.
 Maybe use AUTOINCREMENT on pks
+batch_nb can be preceded by 0s. Should be a varchar and then have checks to make sure its all numbers.
+mouse_nb should be unique (or mouse_nb x study_id ?)
+revise sql trigger constraints.
+Maybe limit updates and deletes if nothing is referencing the record yet ?

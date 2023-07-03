@@ -11,9 +11,23 @@ import { getDatabase } from './utils';
   await db.run(`
     CREATE TABLE "Group" (
     "id" integer PRIMARY KEY,
-    "title" varchar,
-    "description" varchar
+    "title" varchar UNIQUE,
     )`);
+
+  await db.run(`
+    CREATE TABLE "Group_Dummy" (
+    "id" integer PRIMARY KEY,
+    "title" varchar,
+    )`);
+
+  await db.run(`
+    CREATE TABLE "Group_Dummy_ref" (
+      "group_dummy_id" integer,
+      "group_id" integer,
+      PRIMARY KEY ("group_dummy_id", "group_id"),
+      FOREIGN KEY ("group_dummy_id") REFERENCES "Group_Dummy" ("id"),
+      FOREIGN KEY ("group_id") REFERENCES "Group" ("id")
+    )`)
 
   await db.run(`
     CREATE TABLE "Ethical_Project" (
@@ -76,16 +90,12 @@ import { getDatabase } from './utils';
   await db.run(`
     CREATE TABLE "Cage" (
     "id" integer PRIMARY KEY,
-    "cage_nb" integer
-    )`);
-
-  await db.run(`
-    CREATE TABLE "Cage_Group" (
-    "cage_id" integer,
-    "group_id" integer,
-    PRIMARY KEY ("cage_id", "group_id"),
-    FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id"),
-    FOREIGN KEY ("group_id") REFERENCES "Group" ("id")
+    "cage_nb" integer,
+    "study_id" integer,
+    "group_dummy_id" integer,
+    "version" integer,
+    FOREIGN KEY ("study_id") REFERENCES "Study" ("id"),
+    FOREIGN KEY ("group_dummy_id") REFERENCES "Group_Dummy" ("id")
     )`);
 
   await db.run(`

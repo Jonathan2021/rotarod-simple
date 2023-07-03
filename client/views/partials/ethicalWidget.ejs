@@ -1,17 +1,17 @@
-<div class="dropdown-container">
+<div class="widget-container">
   <h2>Ethical Project</h2>
-  <input type="button" value="Add new" id="addBtnProject" class="dropdown-button" disabled/>
-  <input type="button" value="Update" id="updateBtnProject" class="dropdown-button" disabled />
-  <input type="button" value="Delete" id="deleteBtnProject" class="dropdown-button" disabled />
+  <input type="button" value="Add new" id="addBtnProject" class="widget-button" disabled/>
+  <input type="button" value="Update" id="updateBtnProject" class="widget-button" disabled />
+  <input type="button" value="Delete" id="deleteBtnProject" class="widget-button" disabled />
   <div id="errorMsg" class="error-message"></div>
-  <div id="jqxComboBoxProject" class="dropdown"></div>
+  <div id="jqxComboBoxProject" class="dropdown-container"></div>
 
   <h2>Ethical Experiment</h2>
-  <input type="button" value="Add new" id="addBtnEthExp" class="dropdown-button" disabled/>
-  <input type="button" value="Update" id="updateBtnEthExp" class="dropdown-button" disabled />
-  <input type="button" value="Delete" id="deleteBtnEthExp" class="dropdown-button" disabled />
+  <input type="button" value="Add new" id="addBtnEthExp" class="widget-button" disabled/>
+  <input type="button" value="Update" id="updateBtnEthExp" class="widget-button" disabled />
+  <input type="button" value="Delete" id="deleteBtnEthExp" class="widget-button" disabled />
   <div id="errorMsgEthExp" class="error-message"></div>
-  <div id="jqxComboBoxEthExp" class="dropdown"></div>
+  <div id="jqxComboBoxEthExp" class="dropdown-container"></div>
 </div>
 <script>
 $(document).ready(function () {
@@ -142,6 +142,11 @@ $(document).ready(function () {
         $('#jqxComboBoxProject').jqxComboBox('removeItem', selectedItem);
         $('#errorMsg').hide();
         clearEthExp();
+      },
+      error: function (jqXHR) {
+        let json = JSON.parse(jqXHR.responseText);
+        let errorMessage = json.error;
+        $('#errorMsgEthExp').text(errorMessage).show();
       }
     });
     $('#updateBtnProject, #deleteBtnProject').attr('disabled', 'disabled');
@@ -298,9 +303,6 @@ $(document).ready(function () {
         let json = JSON.parse(jqXHR.responseText);
         let errorMessage = json.error;
         $('#errorMsgEthExp').text(errorMessage).show();
-        if (jqXHR.status === 409) { // HTTP status 409: Conflict
-          refreshExperimentComboBox(projectId);
-        }
       }
     });
   });

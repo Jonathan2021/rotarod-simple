@@ -40,25 +40,31 @@ export const getGroup = async (groupId) => {
   return await db.get(`SELECT * FROM "Group" WHERE id = ?`, groupId);
 };
 
-export const createGroup = async (title, description) => {
+export const findGroup = async (title) => {
+  const db = await getDatabase();
+
+  return await db.get(`SELECT * FROM "Group" WHERE title = ?`, title);
+};
+
+export const createGroup = async (title) => {
   const db = await getDatabase();
 
   const result = await db.run(`
-    INSERT INTO "Group" (title, description)
-    VALUES (?, ?)
-  `, title, description);
+    INSERT INTO "Group" (title)
+    VALUES (?)
+  `, title);
 
   return result.lastID;
 };
 
-export const updateGroup = async (id, title, description) => {
+export const updateGroup = async (id, title) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE "Group"
-    SET title = ?, description = ?
+    SET title = ?
     WHERE id = ?
-  `, title, description, id);
+  `, title, id);
 };
 
 export const deleteGroup = async (id) => {
@@ -69,6 +75,91 @@ export const deleteGroup = async (id) => {
     WHERE id = ?
   `, id);
 };
+
+// Group_Dummy
+
+export const getGroupDummies = async () => {
+  const db = await getDatabase();
+
+  return await db.all(`SELECT * FROM "Group_Dummy"`);
+};
+
+export const getGroupDummy = async (groupDummyId) => {
+  const db = await getDatabase();
+
+  return await db.get(`SELECT * FROM "Group_Dummy" WHERE id = ?`, groupDummyId);
+};
+
+export const findGroupDummy = async (dummyName) => {
+  const db = await getDatabase();
+
+  return await db.get(`SELECT * FROM "Group_Dummy" WHERE dummy_name = ?`, dummyName);
+};
+
+export const createGroupDummy = async (studyId, dummyName) => {
+  const db = await getDatabase();
+
+  const result = await db.run(`
+    INSERT INTO "Group_Dummy" (study_id, dummy_name)
+    VALUES (?, ?)
+  `, studyId, dummyName);
+
+  return result.lastID;
+};
+
+export const updateGroupDummy = async (id, studyId, dummyName) => {
+  const db = await getDatabase();
+
+  await db.run(`
+    UPDATE "Group_Dummy"
+    SET study_id = ?, dummy_name = ?
+    WHERE id = ?
+  `, studyId, dummyName, id);
+};
+
+export const deleteGroupDummy = async (id) => {
+  const db = await getDatabase();
+
+  await db.run(`
+    DELETE FROM "Group_Dummy"
+    WHERE id = ?
+  `, id);
+};
+
+// Group_Dummy_Ref
+
+export const getGroupDummyRefs = async () => {
+  const db = await getDatabase();
+
+  return await db.all(`SELECT * FROM "Group_Dummy_Ref"`);
+};
+
+export const getGroupDummyRef = async (groupDummyId, groupId) => {
+  const db = await getDatabase();
+
+  return await db.get(`SELECT * FROM "Group_Dummy_Ref" WHERE group_dummy_id = ? AND group_id = ?`, groupDummyId, groupId);
+};
+
+export const createGroupDummyRef = async (groupDummyId, groupId) => {
+  const db = await getDatabase();
+
+  const result = await db.run(`
+    INSERT INTO "Group_Dummy_Ref" (group_dummy_id, group_id)
+    VALUES (?, ?)
+  `, groupDummyId, groupId);
+
+  return result.lastID; // please note, the lastID may not return expected results for composite primary keys.
+};
+
+export const deleteGroupDummyRef = async (groupDummyId, groupId) => {
+  const db = await getDatabase();
+
+  await db.run(`
+    DELETE FROM "Group_Dummy_Ref"
+    WHERE group_dummy_id = ? AND group_id = ?
+  `, groupDummyId, groupId);
+};
+
 
 // Ethical Project
 export const getEthicalProjects = async () => {
@@ -236,6 +327,12 @@ export const getBatchTickatlab = async (studyId, batchNb) => {
   return await db.get(`SELECT * FROM "Batch_tickatlab" WHERE study_id = ? AND batch_nb = ?`, studyId, batchNb);
 };
 
+export const getBatchTickatLabFromStudy = async (studyId) => {
+  const db = await getDatabase();
+
+  return await db.all(`SELECT * FROM "Batch_tickatlab" WHERE study_id = ?`, studyId);
+}
+
 export const createBatchTickatlab = async (studyId, batchNb, description) => {
   const db = await getDatabase();
 
@@ -309,7 +406,7 @@ export const deleteMouse = async (id) => {
   `, id);
 };
 
-// Pace
+// Place
 export const getPlaces = async () => {
   const db = await getDatabase();
 
@@ -408,25 +505,25 @@ export const getCage = async (id) => {
   return await db.get(`SELECT * FROM "Cage" WHERE id = ?`, id);
 };
 
-export const createCage = async (cageNb) => {
+export const createCage = async (cageNb, study_id, group_dummy_id, version) => {
   const db = await getDatabase();
 
   const result = await db.run(`
-    INSERT INTO "Cage" (cage_nb)
-    VALUES (?)
-  `, cageNb);
+    INSERT INTO "Cage" (cage_nb, study_id, group_dummy_id, version)
+    VALUES (?, ?, ?, ?)
+  `, cageNb, study_id, group_dummy_id, version);
 
   return result.lastID;
 };
 
-export const updateCage = async (id, cageNb) => {
+export const updateCage = async (id, cageNb, study_id, group_dummy_id) => {
   const db = await getDatabase();
 
   await db.run(`
     UPDATE "Cage"
-    SET cage_nb = ?
+    SET cage_nb = ?, study_id = ?, group_dummy_id = ?, version = ?
     WHERE id = ?
-  `, cageNb, id);
+  `, cageNb, study_id, group_dummy_id, id);
 };
 
 export const deleteCage = async (id) => {

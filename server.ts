@@ -8,10 +8,11 @@ import sqlite3 from 'sqlite3';
 
 import {
   isUniqueConstraintError,
-  getGroups, getGroup, createGroup, updateGroup, deleteGroup,
+  getGroups, getGroup, createGroup, updateGroup, deleteGroup, findGroup,
   getEthicalProjects, getEthicalProject, createEthicalProject, updateEthicalProject, deleteEthicalProject, findEthicalProject,
   getEthicalExperimentsFromProject, createEthicalExperiment, updateEthicalExperiment, deleteEthicalExperiment, findEthicalExperiment, getEthicalExperiments,
-  createStudy, updateStudy, findStudyByTitle, getStudy, deleteStudy
+  createStudy, updateStudy, findStudyByTitle, getStudy, deleteStudy,
+  getBatchTickatLabFromStudy, createBatchTickatlab, deleteBatchTickatlab, updateBatchTickatlab, getBatchTickatlab
 } from './server/utils'
 
 declare module 'express-session' {
@@ -109,14 +110,24 @@ app.get('/groups', async (req, res) => {
 });
 
 app.post('/groups', async (req, res) => {
-  const { title, description } = req.body;
-  const id = await createGroup(title, description);
-  res.json({ id });
+  const { title } = req.body;
+  try
+  {
+    const id = await createGroup(title);
+    res.json({ id });
+  } catch (err) {
+    console.log(err);
+    if (isUniqueConstraintError(err)) {
+      const existingRecord = await findGroup(title);
+      res.status(409).json({ error: 'A project with this title already exists.', id: existingRecord.id }); // HTTP status 409: Conflict
+    } else {
+      res.status(500).json({ error: 'An error occurred while creating the project.' }); // HTTP status 500: Internal Server Error
+    }}
 });
 
 app.put('/groups/:id', async (req, res) => {
-  const { title, description } = req.body;
-  await updateGroup(req.params.id, title, description);
+  const { title } = req.body;
+  await updateGroup(req.params.id, title);
   res.json({ success: true });
 });
 
@@ -268,7 +279,7 @@ app.get('/study/:id/form', async (req, res) => {
         if (!study) {
             res.status(404).send('Study not found'); // HTTP status 404: Not Found
         } else {
-            res.render('study_form', { study: study });
+            res.render('study_form', { study: study , study_id : study.id});
         }
     } catch (err) {
         console.log(err);
@@ -302,6 +313,99 @@ app.delete('/study/:id', async (req, res) => {
         console.log(err);
         res.status(500).json({ error: 'An error occurred while deleting the study.' });
     }
+});
+
+// Batch
+
+// Fetch all batches for a study
+app.get('/study/:study_id/batch_data', async (req, res) => {
+  const { study_id } = req.params;
+  
+  try {
+    const batches = await getBatchTickatLabFromStudy(study_id);
+    res.json(batches);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: 'An error occurred while fetching batches.' }); // HTTP status 500: Internal Server Error
+  }
+});
+
+// Render the batches standalone
+app.get('/study/:study_id/batches', async (req, res) => {
+  const { study_id } = req.params;
+  res.render('widgetStandalone', { partial: "partials/batchWidget.ejs", study_id });
+});
+
+// Render the batch form for creating a new batch
+app.get('/study/:study_id/batch_form', async (req, res) => {
+  const { study_id } = req.params;
+  res.render('batch_form', { study_id, batch: null });
+});
+
+// Render the batch form for updating an existing batch
+app.get('/study/:study_id/batch_form/:batch_nb', async (req, res) => {
+  const { study_id, batch_nb } = req.params;
+  
+  try {
+    const batch = await getBatchTickatlab(study_id, batch_nb);
+    if (!batch) {
+      res.status(404).send('Batch not found'); // HTTP status 404: Not Found
+    } else {
+      res.render('batch_form', { study_id, batch });
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).send('An error occurred while retrieving the batch.'); // HTTP status 500: Internal Server Error
+  }
+});
+
+// Create a new batch
+app.post('/study/:study_id/batch', async (req, res) => {
+  const { study_id } = req.params;
+  const { batch_nb, description } = req.body;
+  
+  try {
+    await createBatchTickatlab(study_id, batch_nb, description);
+    res.json({ message: 'Batch created successfully' });
+  } catch (err) {
+    console.log(err);
+    if (isUniqueConstraintError(err)) {
+      res.status(409).json({ error: 'A batch with this number already exists for this study.' }); // HTTP status 409: Conflict
+    } else {
+      res.status(500).json({ error: 'An error occurred while creating the batch.' }); // HTTP status 500: Internal Server Error
+    }
+  }
+});
+
+// Update an existing batch
+app.put('/study/:study_id/batch/:batch_nb', async (req, res) => {
+  const { study_id, batch_nb } = req.params;
+  const { description } = req.body;
+  
+  try {
+    await updateBatchTickatlab(study_id, batch_nb, description);
+    res.json({ message: 'Batch updated successfully' });
+  } catch (err) {
+    console.log(err);
+    if (isUniqueConstraintError(err)) {
+      res.status(409).json({ error: 'A batch with this number already exists for this study.' }); // HTTP status 409: Conflict
+    } else {
+      res.status(500).json({ error: 'An error occurred while updating the batch.' }); // HTTP status 500: Internal Server Error
+    }
+  }
+});
+
+// Delete an existing batch
+app.delete('/study/:study_id/batch/:batch_nb', async (req, res) => {
+  const { study_id, batch_nb } = req.params;
+  
+  try {
+    await deleteBatchTickatlab(study_id, batch_nb);
+    res.json({ message: 'Batch deleted successfully' });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: 'An error occurred while deleting the batch.' }); // HTTP status 500: Internal Server Error
+  }
 });
 
 /*
