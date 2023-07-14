@@ -1,0 +1,482 @@
+<div class="widget-container">
+    <div id="mainSplitter">
+        <div>
+            <div id="leftSplitter">
+                <div style="overflow: hidden;" id="studyDiv">
+                    <input type="button" value="Add new" id="addBtnStudy" class="widget-button" />
+                    <input type="button" value="Update Study" id="updateBtnStudy" class="widget-button"/>
+                    <input type="button" value="Delete" id="deleteBtnStudy" class="widget-button"/>
+                    <div id="jqxListBoxStudy" , class="list-container"></div>
+                </div>
+                <div style="overflow: hidden;" id="expDiv">
+                    <input type="button" value="Add Experiment" id="addExpBtn" class="widget-button" />
+                    <input type="button" value="Update Experiment" id="updateExpBtn" class="widget-button"/>
+                    <input type="button" value="Delete Experiment" id="deleteExpBtn" class="widget-button"/>
+                    <div id="jqxListBoxExp" , class="list-container"></div>
+                </div>
+            </div>
+        </div>
+        <div>
+            <div style="overflow: hidden;" id="runDiv">
+                <input type="button" value="Add Run" id="addRunBtn" class="widget-button" />
+                <input type="button" value="Update Run" id="updateRunBtn" class="widget-button"/>
+                <input type="button" value="Delete Run" id="deleteRunBtn" class="widget-button"/>
+                <div id="jqxListBoxRun" , class="list-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+let sourceStudy = {
+    localdata: [],
+    datatype: "json"
+};
+
+let sourceExp = {
+    localdata: [],
+    datatype: "json"
+};
+
+let sourceRun = {
+    localdata: [],
+    datatype: "json"
+};
+
+let dataAdapterStudy = new $.jqx.dataAdapter(sourceStudy);
+let dataAdapterExp = new $.jqx.dataAdapter(sourceExp);
+let dataAdapterRun = new $.jqx.dataAdapter(sourceRun);
+
+let StudyList = $("#jqxListBoxStudy").jqxListBox({
+    source: dataAdapterStudy,
+    valueMember: "id",
+    displayMember: "title",
+    width: '100%',
+    height: '100%'
+});
+
+let ExpList = $("#jqxListBoxExp").jqxListBox({
+    source: dataAdapterExp,
+    valueMember: "id",
+    displayMember: "title",
+    width: '100%',
+    height: '100%'
+});
+
+let RunList = $("#jqxListBoxRun").jqxListBox({
+    source: dataAdapterRun,
+    valueMember: "id",
+    displayMember: "date",
+    width: '100%',
+    height: '100%'
+});
+
+
+let updatePanel = function (index) {
+    $('#ContentPanel').show();
+    let expData = ExpList()('getItem', index);
+    $("#ContentPanel").html("<div style='margin: 10px;'><b>exp:</b> " + JSON.stringify(expData.originalItem) + "</div>");
+}
+
+let studyChangeEvent = function(detail) { return new CustomEvent("studyChange", {detail} ); }
+let expChangeEvent = function(detail) { return new CustomEvent("expChange", {detail} ); }
+let runChangeEvent = function(detail) { return new CustomEvent("runChange", {detail} ); }
+
+let refreshStudy = function () {
+    return new Promise((resolve, reject) => {
+        $.ajax({
+            url: "/study_data",
+            type: "GET",
+            success: function (data) {
+                sourceStudy.localdata = data;
+                StudyList()('refresh');
+                studyChangeEvent();
+                resolve();
+            },
+            error: function(error)
+            {
+                reject(error);
+            }
+        });
+    });
+};
+
+let refreshExp = function (study_id) {
+    return new Promise((resolve, reject) => {
+        $.ajax({
+            url: "/study/" + study_id + "/experiment_data",
+            type: "GET",
+            success: function (data) {
+                sourceExp.localdata = data;
+                ExpList()('refresh');
+                expChangeEvent(study_id);
+                resolve();
+            },
+            error: function(error)
+            {
+                reject(error);
+            }
+        });
+    });
+};
+
+let refreshRun = function (study_id, exp_id) {
+    return new Promise((resolve, reject) => {
+        $.ajax({
+            url: "/study/" + study_id + "/experiment/" + exp_id + "/run_data",
+            type: "GET",
+            success: function (data) {
+                sourceExp.localdata = data;
+                ExpList()('refresh');
+                expChangeEvent(study_id, exp_id);
+                resolve();
+            },
+            error: function(error)
+            {
+                reject(error);
+            }
+        });
+    });
+};
+
+$(document).ready(function () {
+    $('#updateBtnStudy, #deleteBtnStudy').attr('disabled', 'disabled');
+
+    let studyUpdateEvent = function(detail) { return new CustomEvent('studyUpdate', {detail} ); }
+    let studyCreateEvent = function(detail) { return new CustomEvent('studyCreate', {detail} ); }
+    let studyDeleteEvent = function(detail) { return new CustomEvent('studyDelete', {detail} ); }
+
+    let expUpdateEvent = function(detail) { return new CustomEvent('expUpdate', {detail} ); }
+    let expCreateEvent = function(detail) { return new CustomEvent('expCreate', {detail} ); }
+    let expDeleteEvent = function(detail) { return new CustomEvent('expDelete', {detail} ); }
+
+    let runUpdateEvent = function(detail) { return new CustomEvent('runUpdate', {detail} ); }
+    let runCreateEvent = function(detail) { return new CustomEvent('runCreate', {detail} ); }
+    let runDeleteEvent = function(detail) { return new CustomEvent('runDelete', {detail} ); }
+    
+    $("#mainSplitter").jqxSplitter({ width: '100%', height: '100%', orientation: 'vertical', panels: [{ size: '50%' }, { size: '50%' }] });
+    $("#leftSplitter").jqxSplitter({ width: '100%', height: '100%', orientation: 'vertical', panels: [{ size: '50%' }, { size: '50%' }] }); 
+    
+    let populate = <%- populate %>;
+    
+    if (typeof populate !== 'undefined' && populate) {
+        refreshStudy()
+            .then(() => {
+                // Additional logic after the widget is initialized.
+            })
+            .catch((error) => {
+                console.error(error);
+            });
+    }
+    
+    let hideRun =  function () {
+        $('#runDiv').hide();
+    }
+    
+    let showRun =  function () {
+        $('#runDiv').show();
+    }
+
+    let hidExp =  function () {
+        hideRun();
+        $('#expDiv').hide();
+    }
+    
+    let showExp =  function () {
+        $('#expDiv').show();
+    }
+
+
+    let enableButtonsStudy = function() {
+        $('#updateBtnStudy, #deleteBtnStudy').removeAttr('disabled');
+    }
+    
+    let disableButtonsStudy = function() {
+        $('#updateBtnStudy, #deleteBtnStudy').attr('disabled', 'disabled');
+    }
+
+    let enableButtonsExp = function() {
+        $('#updateExpBtn, #deleteExpBtn').removeAttr('disabled');
+    }
+    
+    let disableButtonsExp = function() {
+        $('#updateExpBtn, #deleteExpBtn').attr('disabled', 'disabled');
+    }
+
+    let enableButtonsRun = function() {
+        $('#updateRunBtn, #deleteRunBtn').removeAttr('disabled');
+    }
+    
+    let disableButtonsRun = function() {
+        $('#updateRunBtn, #deleteRunBtn').attr('disabled', 'disabled');
+    }
+
+    hideExp();
+    disableButtonsStudy();
+    disableButtonsExp();
+    disableButtonsRun();
+
+    $('#jqxListBoxStudy').on('select', function (event) {
+        if (event.args) {
+            let studyId = event.args.item.value;
+            refreshExp(studyId).then(() => {}).catch((error) => { console.error(error) });
+            enableButtonsStudy();
+            showExp();
+        }
+        else {
+            hideExp();
+            disableButtonsStudy();
+        }
+    });
+
+    $('#jqxListBoxExp').on('select', function (event) {
+        if (event.args) {
+            enableButtonsExp();
+            const item = ExpList('getItem', event.args.index);
+            refreshRun(item.study_id, item.id);
+        } else {
+            disableButtonsExp();
+        }
+    });
+
+    $('#jqxListBoxRun').on('select', function (event) {
+        if (event.args) {
+            enableButtonsRun();
+        } else {
+            disableButtonsRun();
+        }
+    });
+    
+    window.addEventListener('studyCreate', function(e){
+        refreshStudy().then(() => {
+            StudyList()('selectItem', e.detail.id);
+        }).catch(error => console.error(error));
+    });
+
+    window.addEventListener('studyUpdate', function(e){
+        refreshStudy().catch(error => console.error(error));
+    });
+
+    window.addEventListener('expCreate', function(e){
+        refreshExp(e.detail.study_id).then( () => {
+                ExpList()('selectItem', e.detail.id);
+            }).catch(error => console.error(error));
+    });
+    
+    window.addEventListener('expUpdate', function(e){
+        refreshStudy().catch(error => console.error(error));
+    });
+
+    $('#addBtnStudy').click(function () {
+        let title = prompt("Please enter the title for the new study:");
+        if (title != null && title != "") {
+            $.ajax({
+                url: "/study/",
+                type: "POST",
+                data: title,
+                success: function (data) {
+                    window.dispatchEvent(studyCreateEvent({ id : data.id }));
+                },
+                error: function(jqXHR)
+                {
+                    let json = JSON.parse(jqXHR.responseText);
+                    alert(json.error);
+                }
+            });
+        }
+        else
+        {
+            alert("The study title can't be empty");
+        }
+    });
+
+    $('#updateBtnStudy').click(function () {
+        let selectedStudy = StudyList()('getSelectedItem');
+        if (!selectedStudy)
+            alert("Please select a study to update");
+        selectedStudy = selectedStudy.originalItem;
+        
+        let newTitle = prompt("Please enter a new title for the study:", selectedStudy.title);
+
+        if (newTitle != null && newTitle != "") {
+            $.ajax({ 
+                url: '/study/' + selectedStudy.id,
+                type: 'PUT',
+                data: newTitle,
+                success: function (data) {
+                    window.dispatchEvent(studyUpdateEvent({ id: data.id }));
+                },
+                error: function (jqXHR) {
+                    let json = JSON.parse(jqXHR.responseText);
+                    alert(json.error);
+                }
+            });
+        }
+        else
+        {
+            alert("The study title can't be empty");
+        }
+    });
+
+    $('#deleteBtnStudy').click(function () {
+        let selectedStudy = StudyList()('getSelectedItem');
+        if (!selectedStudy)
+        {
+            alert('Please select a Study to delete');
+            return;
+        }
+        if (!confirm("Delete this study and its related material ?"))
+            return;
+        let study_id = selectedStudy.value;
+        $.ajax({
+            url: '/study/' + study_id,
+            type: 'DELETE',
+            success: function () {
+                StudyList()('removeItem', selectedStudy);
+                window.dispatchEvent(studyDeleteEvent({id : study_id }));
+            },
+            error: function (jqXHR) {
+                let json = JSON.parse(jqXHR.responseText);
+                let errorMessage = json.error;
+                alert(errorMessage);
+            }
+        });
+    });
+
+    $('#addExpBtn').click(function () {
+        let study_id = StudyList()('getSelectedItem').value;
+        let title = prompt("Please enter the title for the new experiment:");
+        if (title != null && title != "") {
+            $.ajax({
+                url: "/study/" + study_id + "/experiment",
+                type: "POST",
+                data: title,
+                success: function (data) {
+                    window.dispatchEvent(expCreateEvent({ id: data.id, study_id : study_id }));
+                },
+                error: function(jqXHR)
+                {
+                    let json = JSON.parse(jqXHR.responseText);
+                    alert(json.error);
+                }
+            });
+        }
+        else
+        {
+            alert("The experiment title can't be empty");
+        }
+    });
+
+    $('#updateExpBtn').click(function () {
+        let study_id = StudyList()('getSelectedItem').value;
+        let selectedExp = ExpList()('getSelectedItem').originalItem;
+        let newTitle = prompt("Please enter the new title for the experiment:", selectedExp.title);
+        if (newTitle != null && newTitle != "") {
+            $.ajax({
+                url: "/study/" + study_id + "/experiment/" + selectedExp.id,
+                type: "PUT",
+                data: newTitle,
+                success: function (data) {
+                    window.dispatchEvent(expChangeEvent({ id: data.id, study_id : study_id }));
+                },
+                error: function(jqXHR)
+                {
+                    let json = JSON.parse(jqXHR.responseText);
+                    alert(json.error);
+                }
+            });
+        }
+        else
+        {
+            alert("The experiment title can't be empty");
+        }
+    });
+
+    $('#deleteExpBtn').click(function () {
+        let study_id = StudyList()('getSelectedItem').value;
+        let selectedExp = ExpList()('getSelectedItem');
+        if (!selectedExp)
+        {
+            alert('Please select an experiment to delete.');
+            return;
+        }
+        if(!confirm(`Delete the selected experiment and its associated data ?`))
+            return;
+        
+        const exp_id = selectedExp.value;
+        $.ajax({
+            url: "/study/" + study_id + "/experiment/" + exp_id,
+            type: 'DELETE',
+            success: function() {
+                ExpList()('removeItem', selectedExp);
+                window.dispatchEvent(expDeleteEvent({id : exp_id }));
+            },
+            error: function (jqXHR) {
+                let json = JSON.parse(jqXHR.responseText);
+                let errorMessage = json.error;
+                alert(errorMessage);
+            }
+        });
+    });
+
+    $('#addRunBtn').click(function () {
+        let study_id = StudyList()('getSelectedItem').value;
+        let exp_id = ExpList()('getSelectedItem').value;
+        $.ajax({
+            url: "/study/" + study_id + "/experiment/" + exp_id + "/run",
+            type: "GET",
+            error: function(jqXHR)
+            {
+                let json = JSON.parse(jqXHR.responseText);
+                alert(json.error);
+            }
+        });
+    });
+    
+    $('#updateRunBtn').click(function () {
+        let study_id = StudyList()('getSelectedItem').value;
+        let exp_id = ExpList()('getSelectedItem').value;
+        let run_id = RunList()('getSelectedItem').value;
+        $.ajax({
+            url: "/study/" + study_id + "/experiment/" + exp_id + "/run/" + run_id,
+            type: "GET",
+            error: function(jqXHR)
+            {
+                let json = JSON.parse(jqXHR.responseText);
+                alert(json.error);
+            }
+        });
+    });
+
+    $('#deleteRunBtn').click(function () {
+        let study_id = StudyList()('getSelectedItem').value;
+        let exp_id = ExpList()('getSelectedItem').value;
+        let selectedRun = RunList()('getSelectedItem');
+        if (!selectedRun)
+        {
+            alert('Please select a run to delete.');
+            return;
+        }
+        
+        if(!confirm(`Delete the selected run and its associated data ?`))
+            return;
+        
+        const run_id = selectedExp.value;
+        $.ajax({
+            url: "/study/" + study_id + "/experiment/" + exp_id + '/run/' + run_id,
+            type: 'DELETE',
+            success: function() {
+                RunList()('removeItem', selectedExp);
+                window.dispatchEvent(runDeleteEvent({id : run_id }));
+            },
+            error: function (jqXHR) {
+                let json = JSON.parse(jqXHR.responseText);
+                let errorMessage = json.error;
+                alert(errorMessage);
+            }
+        });
+    });
+
+});
+</script>
