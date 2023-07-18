@@ -8,35 +8,62 @@ import { getDatabase } from './utils';
   const db = await getDatabase();
   // Execute SQL queries to create tables
   await db.run(`
-    CREATE TABLE "Mouse" (
+  CREATE TABLE "Study" (
+    "id" INTEGER PRIMARY KEY,
+    "title" VARCHAR UNIQUE
+  )`);
+
+  await db.run(`
+  CREATE TABLE "Experiment" (
+    "id" INTEGER PRIMARY KEY,
+    "study_id" INTEGER,
+    "title" VARCHAR,
+    FOREIGN KEY ("study_id") REFERENCES "Study" ("id")
+  )`);
+
+  await db.run(`CREATE UNIQUE INDEX "experiment_study_title_index" ON "Experiment" ("study_id", "title")`);
+  await db.run(`CREATE INDEX "experiment_study_index" ON "Experiment" ("study_id")`);
+
+  await db.run(`
+  CREATE TABLE "Cage" (
+    "id" INTEGER PRIMARY KEY,
+    "cage_nb" INTEGER,
+    "exp_id" INTEGER,
+    FOREIGN KEY ("exp_id") REFERENCES "Experiment" ("id")
+  )`);
+  
+  await db.run(`CREATE INDEX "cage_exp_id" ON "Cage" ("exp_id")`);
+
+  await db.run(`
+  CREATE TABLE "Mouse" (
     "id" INTEGER PRIMARY KEY,
     "cage_id" INTEGER,
     "ucb_identifier" INTEGER,
-    "zigosity" TEXT,
+    "zigosity" VARCHAR,
     FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id")
   )`);
+  
+  await db.run(`CREATE INDEX "mouse_cage_id" ON "Mouse" ("cage_id")`);
 
   await db.run(`
-    CREATE TABLE "Cage" (
+  CREATE TABLE "Run" (
     "id" INTEGER PRIMARY KEY,
-    "cage_nb" INTEGER
+    "experiment_id" INTEGER,
+    "is_constant_rpm" INTEGER CHECK("is_constant_rpm" IN (0, 1)),
+    "rpm" INTEGER,
+    "experimentator" VARCHAR,
+    "date_acclim" TIMESTAMP,
+    "temperature" VARCHAR,
+    "humidity" VARCHAR,
+    "lux" VARCHAR,
+    "other" VARCHAR,
+    FOREIGN KEY ("experiment_id") REFERENCES "Experiment" ("id")
   )`);
+  
+  await db.run(`CREATE INDEX "run_experiment_index" ON "Run" ("experiment_id")`);
 
   await db.run(`
-    CREATE TABLE "Run" (
-    "id" INTEGER PRIMARY KEY,
-    "constant_speed" INTEGER CHECK( constant_speed IN (0,1) ),
-    "Experimentator" TEXT,
-    "day" TEXT,
-    "acclimatation" TEXT,
-    "temperature" TEXT,
-    "humidity" TEXT,
-    "lux" TEXT,
-    "other" TEXT
-  )`);
-
-  await db.run(`
-    CREATE TABLE "Run_Ordering" (
+  CREATE TABLE "Run_Ordering" (
     "cage_id" INTEGER,
     "run_id" INTEGER,
     "order" INTEGER,
@@ -48,7 +75,7 @@ import { getDatabase } from './utils';
   await db.run(`CREATE UNIQUE INDEX "run_ordering_index" ON "Run_Ordering" ("run_id", "order")`);
 
   await db.run(`
-    CREATE TABLE "Trial" (
+  CREATE TABLE "Trial" (
     "id" INTEGER PRIMARY KEY,
     "run_id" INTEGER,
     "trial_nb" INTEGER,
@@ -58,7 +85,7 @@ import { getDatabase } from './utils';
   await db.run(`CREATE UNIQUE INDEX "trial_index" ON "Trial" ("run_id", "trial_nb")`);
 
   await db.run(`
-    CREATE TABLE "Trial_record" (
+  CREATE TABLE "Trial_record" (
     "trial_id" INTEGER,
     "mouse_id" INTEGER,
     "time_record" INTEGER,

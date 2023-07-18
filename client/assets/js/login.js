@@ -11,7 +11,7 @@ $(document).ready(function() {
         }, function(data, status) {
             if (status === 'success' && data.displayName) {
                 // Handle successful login, e.g. redirect to the main page
-                window.location.href = '/main.html';
+                window.location.href = '/main';
             } else {
                 // Handle failed login, e.g. show an error message and clear password field
                 $('#login-error').text('Login failed. Please try again.');

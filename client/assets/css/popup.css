@@ -1,0 +1,64 @@
+.popup-window {
+    max-width: 100%;
+    max-height: 100%;
+    padding: 16px;
+    background-color: white;
+    margin: 0 auto;
+    border: 1px solid black;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.popup-window h2 {
+    text-align: center;
+}
+
+.popup-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.popup-form input {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+.popup-submit-button {
+    padding: 10px;
+    border-radius: 4px;
+    border: none;
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+}
+
+.popup-submit-button:hover {
+    background-color: #45a049;
+}
+
+.popup-cancel-button {
+    margin-left: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+}
+
+.popup-button {
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    color: black;
+}
+
+.popup-button:disabled {
+    background-color: #a9a9a9; /* A darker shade of gray for disabled state */
+    cursor: not-allowed;
+}
+
+.popup-button:hover {
+    background-color: #bdbdbd; /* A lighter shade of gray for hover state */
+}

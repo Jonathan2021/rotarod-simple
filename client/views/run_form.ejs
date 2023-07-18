@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<%- include('partials/header.ejs') %>
+<body>
+    <div class="form-container">
+    <h2><%= run ? 'Edit' : 'New' %> Run</h2>
+
+    <form id="runForm" method="post">
+        <label for="is_constant_rpm">Constant RPM:</label>
+        <input type="checkbox" id="is_constant_rpm" name="is_constant_rpm" <%= (run && run.is_constant_rpm ==1) ? 'checked' : '' %>>
+
+        <div id="rpm_field" style="<%= !(run && run.is_constant_rpm == 1) ? 'display: none;' : '' %>">
+            <label for="rpm">RPM:</label>
+            <input type="number" id="rpm" name="rpm" value="<%= run ? run.rpm : '' %>">
+        </div>
+
+        <label for="experimentator">Experimentator:</label>
+        <input type="text" id="experimentator" name="experimentator" value="<%= run ? run.experimentator : '' %>">
+
+        <label for="date_acclim">Date and acclimatation time:</label>
+        <%
+        function toLocalISOString(date) {
+            let tzoffset = date.getTimezoneOffset() * 60000;
+            let localISOTime = (new Date(date - tzoffset)).toISOString().slice(0,-1);
+            return localISOTime.slice(0, 16);
+        }
+        %>
+        <input type="datetime-local" id="date_acclim" name="date_acclim" value='<%= run && run.date_acclim !=="" ? run.date_acclim : toLocalISOString(new Date()) %>'>
+
+        <label for="temperature">Temperature:</label>
+        <input type="text" id="temperature" name="temperature" value="<%= run ? run.temperature : '' %>">
+
+        <label for="humidity">Humidity:</label>
+        <input type="text" id="humidity" name="humidity" value="<%= run ? run.humidity : '' %>">
+
+        <label for="lux">Lux:</label>
+        <input type="text" id="lux" name="lux" value="<%= run ? run.lux : '' %>">
+
+        <label for="other">Other:</label>
+        <input type="text" id="other" name="other" value="<%= run ? run.other : '' %>">
+
+        <button class="form-button" type="submit">Save Run</button>
+    </form>
+    </div>
+    <script>
+        $('#is_constant_rpm').on('change', function() {
+            if($(this).is(":checked")) {
+                $('#rpm_field').show();
+            } else {
+                $('#rpm_field').hide();
+            }
+        });
+
+        $('#runForm').on('submit', function(e) {
+            e.preventDefault(); // Prevent the default form submission
+            
+            let run = <%- JSON.stringify(run) %>;
+            let type = 'POST'
+            let url="/study/<%= study_id %>/experiment/<%= exp_id %>/run";
+            if (run) {
+                type = "PUT";
+                url += "/" + run.id;
+            }
+
+            let is_constant = ($('#is_constant_rpm').is(":checked")) ? 1 : 0;
+            let jsonObject = {
+                
+                is_constant_rpm: is_constant,
+                rpm: $('#rpm').val(),
+                experimentator: $('#experimentator').val(),
+                date_acclim: $('#date_acclim').val(),
+                temperature: $('#temperature').val(),
+                humidity: $('#humidity').val(),
+                lux: $('#lux').val(),
+                other: $('#other').val(),
+            };
+
+            $.ajax({
+                url: url,
+                type: type,
+                data: jsonObject,
+                success: function(data) {
+                    if (data.redirect)
+                        window.location.href = data.redirect;
+                },
+                error: function (jqXHR) {
+                    let json = JSON.parse(jqXHR.responseText);
+                    let errorMessage = json.error;
+                    alert(errorMessage);
+                }
+                });
+        });
+    </script>
+</body>

@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": {
-  },
+  "scripts": {},
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@types/express": "^4.17.17",
     "@types/express-session": "^1.17.7",
+    "@types/method-override": "^0.0.32",
     "@types/node": "^20.3.1",
     "body-parser": "^1.20.2",
     "clear-npx-cache": "^1.0.1",
