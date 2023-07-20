@@ -52,3 +52,9 @@ html, body {
   border: 1px solid #ccc;
   border-radius: 4px;
 }
+
+.alert {
+  padding: 20px;
+  background-color: #f44336;
+  color: white;
+}

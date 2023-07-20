@@ -3,13 +3,14 @@
 <body>
     <div class="form-container">
     <h2><%= run ? 'Edit' : 'New' %> Run</h2>
+    <h3>Linked to <a href="javascript:window.open('/study/<%= study_id %>/experiment/<%= exp_id %>', 'Update exp <%= exp_id %>', 'width=750, height=750')">the following experiment</a></h3>
 
     <form id="runForm" method="post">
         <label for="is_constant_rpm">Constant RPM:</label>
         <input type="checkbox" id="is_constant_rpm" name="is_constant_rpm" <%= (run && run.is_constant_rpm ==1) ? 'checked' : '' %>>
 
         <div id="rpm_field" style="<%= !(run && run.is_constant_rpm == 1) ? 'display: none;' : '' %>">
-            <label for="rpm">RPM:</label>
+            <label for="rpm">Value of constant RPM:</label>
             <input type="number" id="rpm" name="rpm" value="<%= run ? run.rpm : '' %>">
         </div>
 
@@ -36,12 +37,27 @@
         <input type="text" id="lux" name="lux" value="<%= run ? run.lux : '' %>">
 
         <label for="other">Other:</label>
-        <input type="text" id="other" name="other" value="<%= run ? run.other : '' %>">
+        <textarea id="other" rows="10" cols="30" value="<%= run ? run.other : '' %>"></textarea>
+        <!-- <input type="text" id="other" name="other" value="<%= run ? run.other : '' %>"> -->
 
         <button class="form-button" type="submit">Save Run</button>
     </form>
     </div>
     <script>
+        $(document).ready(function() {
+        let exp_id = <%- exp_id %>;
+        let cageMice = JSON.parse(<%- JSON.stringify(cages) %>);
+        let cage_order = <%- cage_order %>;
+        let trials = <%- JSON.stringify(trials) %>;
+        let trial_records = <%- JSON.stringify(trial_records) %>;
+        
+        window.addEventListener('storage', function(e){
+            if (e.key === "expUpdate" && e.newValue.id == exp_id)
+                location.reload()
+        });
+
+        $("#orderInfo").text("Cage order: " + cage_order.join(', '));
+
         $('#is_constant_rpm').on('change', function() {
             if($(this).is(":checked")) {
                 $('#rpm_field').show();
@@ -52,6 +68,7 @@
 
         $('#runForm').on('submit', function(e) {
             e.preventDefault(); // Prevent the default form submission
+            console.log("Submitting form");
             
             let run = <%- JSON.stringify(run) %>;
             let type = 'POST'
@@ -73,6 +90,10 @@
                 lux: $('#lux').val(),
                 other: $('#other').val(),
             };
+            
+            if (!run)
+                jsonObject['cage_order'] = JSON.stringify(cage_order);
+            console.log(jsonObject);
 
             $.ajax({
                 url: url,
@@ -80,7 +101,7 @@
                 data: jsonObject,
                 success: function(data) {
                     if (data.redirect)
-                        window.location.href = data.redirect;
+                        //window.location.href = data.redirect;
                 },
                 error: function (jqXHR) {
                     let json = JSON.parse(jqXHR.responseText);
@@ -89,5 +110,7 @@
                 }
                 });
         });
+
+    });
     </script>
 </body>

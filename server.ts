@@ -9,11 +9,19 @@ import sqlite3 from 'sqlite3';
 import {
   isUniqueConstraintError, NotFoundError,
   getStudies, createStudy, updateStudy, deleteStudy,
-  getExperimentsFromStudy, createExperiment, updateExperiment, deleteExperiment,
+  getExperimentsFromStudy, createExperiment, updateExperiment, deleteExperiment, countRunsWithTrialsExp,
   getRunsFromExperiment, createRun, updateRun, deleteRun, getRun, getRuns,
   getCageCompleteFromExp, getAllCagesFromExp, deleteCage, createCage,
   getExperiment,
-  updateMouse, deleteMouse, createMouse, getAllMiceFromExp
+  updateMouse, deleteMouse, createMouse, getAllMiceFromExp,
+  shuffleArray,
+  getCageOrder,
+  getTrialsAndRecords,
+  createCageOrder,
+  deleteAllCagesExp,
+  getMice,
+  getCage,
+  getCages,
 } from './server/utils'
 
 declare module 'express-session' {
@@ -141,6 +149,17 @@ app.get('/study/:study_id/experiment/:exp_id/run_data', async(req, res) => {
   }
 });
 
+app.get('/experiment/:exp_id/cages', async(req, res) => {
+  const { exp_id } = req.params;
+  try {
+      const cages = await getAllCagesFromExp(exp_id);
+      res.json(cages);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error : 'An error occured while fetching the cages of the experiment.'});
+  }
+});
+
 
 // Create a new study
 app.post('/study', async (req, res) => {
@@ -205,8 +224,9 @@ app.get('/study/:study_id/experiment/:exp_id', async (req, res) => {
       res.status(404).send("Couldn't find the requested experiment");
     } else {
       const cage_info = await getCageCompleteFromExp(exp_id);
-      console.log(cage_info);
-      res.render("update_exp_form", { cage_info, study_id, exp });
+      console.log("Got cage info ", cage_info);
+      const nbRunsWithTrials = await countRunsWithTrialsExp(exp_id);
+      res.render("update_exp_form", { cage_info, study_id, exp, nruns: nbRunsWithTrials });
     }
   } catch (err) {
     console.log(err);
@@ -237,43 +257,24 @@ interface ICageInfo {
   zigosity: string;
 }
 
-export const updateExperimentCages = async (expId: number, cageInfo: ICageInfo[]) => {
-  const cages = await getCageCompleteFromExp(expId);
-  const mice = await getAllMiceFromExp(expId);
-
-  const cageNbSet = new Set(cageInfo.map(info => info.cage_nb));
-  const miceInfoMap = new Map(cageInfo.map(info => [info.ucb_identifier, info]));
-
-  // Update or move mice
-  for (let mouse of mice) {
-    const newInfo = miceInfoMap.get(mouse.ucb_identifier);
-
-    if (newInfo) {
-      const existingCage = cages.find(cage => cage.cage_nb === newInfo.cage_nb);
-      if (existingCage) {
-        await updateMouse(mouse.id, existingCage.id, mouse.ucb_identifier, newInfo.zigosity);
-      } else {
-        const newCageId = await createCage(newInfo.cage_nb, expId);
-        await updateMouse(mouse.id, newCageId, mouse.ucb_identifier, newInfo.zigosity);
-      }
-    } else {
-      await deleteMouse(mouse.id);
-    }
+const updateExperimentCages = async (expId: number, cageInfo: ICageInfo[]) => {
+  const res = await deleteAllCagesExp(expId);
+  console.log("DELETED ", res);
+  console.log("CAGEINFO", cageInfo);
+  
+  let grouped = {};
+  for (let info of cageInfo)
+  {
+    if (!grouped[info.cage_nb])
+      grouped[info.cage_nb] = [];
+    grouped[info.cage_nb].push({ucb_identifier: info.ucb_identifier, zigosity: info.zigosity});
   }
-
-  // Delete cages that no longer exist
-  for (let cage of cages) {
-    if (!cageNbSet.has(cage.cage_nb)) {
-      await deleteCage(cage.id); // Will cascade delete any remaining mice
-    }
-  }
-
-  // Create new cages and mice
-  for (let info of cageInfo) {
-    const existingCage = cages.find(cage => cage.cage_nb === info.cage_nb);
-    if (!existingCage) {
-      const newCageId = await createCage(info.cage_nb, expId);
-      await createMouse(newCageId, info.ucb_identifier, info.zigosity);
+  console.log("GROUPED ", grouped);
+  let cage_id;
+  for (let cage of Object.keys(grouped)) {
+    cage_id = await createCage(cage, expId);
+    for (let info_mouse of grouped[cage]) {
+      await createMouse(cage_id, info_mouse.ucb_identifier, info_mouse.zigosity);
     }
   }
 };
@@ -281,12 +282,16 @@ export const updateExperimentCages = async (expId: number, cageInfo: ICageInfo[]
 // Update an experiment
 app.put('/study/:study_id/experiment/:exp_id', async (req, res) => {
   const exp_id = parseInt(req.params.exp_id);
-  const { title, cage_info } = req.body;
-  console.log(cage_info);
+  const { title } = req.body;
   
   try {
     await updateExperiment(exp_id, title);
-    await updateExperimentCages(exp_id, cage_info);
+    const nbRunsWithTrials = await countRunsWithTrialsExp(exp_id);
+    if (!nbRunsWithTrials)
+    {
+      const cage_info = JSON.parse(req.body.cage_info);
+      await updateExperimentCages(exp_id, cage_info);
+    }
     res.json({ exp_id });
   } catch (err) {
     console.log(err);
@@ -317,14 +322,38 @@ app.delete('/study/:study_id/experiment/:exp_id', async (req, res) => {
   }
 });
 
+
+const getCageMice = async (expId: number) => {
+  let cage_info = await getCageCompleteFromExp(expId);
+  let dict = {};
+
+  for(let item of cage_info) {
+    if(!dict[item.cage_nb]) {
+      dict[item.cage_nb] = [];
+    }
+    dict[item.cage_nb].push(item.ucb_identifier);
+  }
+  return dict;
+};
+
 // Getting the run page for a new run
 app.get('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
-  res.render('run_form', {study_id : req.params.study_id, exp_id : req.params.exp_id, run: null});
+  const { study_id, exp_id } = req.params;
+  try
+  {
+    const cages = await getCageMice(parseInt(exp_id));
+    const cage_order = shuffleArray(Object.keys(cages)).map(Number);
+    console.log(cage_order);
+    res.render('run_form', {study_id, exp_id, run: null, cages : JSON.stringify(cages), cage_order: JSON.stringify(cage_order), trials: JSON.stringify([]), trial_records : JSON.stringify([])});
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("An error occured while retrieving the cages");
+  }
 });
 
 // Getting the run page for an existing run
 app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
-  const run_id = req.params.run_id;
+  const { run_id, exp_id, study_id } = req.params;
   console.log("Getting run")
   try {
     const run = await getRun(run_id);
@@ -332,11 +361,33 @@ app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
     {
       res.status(404).send("Couldn't find the requested run");
     } else {
-    res.render('run_form', {study_id : req.params.study_id, exp_id : req.params.exp_id, run});
+      const cages = await getCageMice(parseInt(exp_id));
+      const cage_order = await getCageOrder(run_id);
+      const trials = await getTrialsAndRecords(run_id);
+      let only_trials = [];
+      let trial_records = []
+      for (let trial_id of Object.keys(trials)) {
+          only_trials.push({
+            id: trial_id,
+            trial_time: trials[trial_id].trial_time,
+            exists: true,
+          });
+          let trial_record = [];
+          for (let record of trials[trial_id].records) {
+            trial_record.push({
+              mouse_id: record.mouse_id,
+              time_record: record.time_record,
+              rpm_record: record.rpm_record,
+              exists: true
+            });
+          }
+          trial_records.push({trial_id, records: trial_record });
     }
+    res.render('run_form', {study_id, exp_id, run: JSON.stringify(run), cages : JSON.stringify(cages), cage_order: JSON.stringify(cage_order), trials: JSON.stringify(only_trials), trial_records : JSON.stringify(trial_records)});
+  }
   } catch (err) {
     console.log(err);
-    res.status(500).send("An error occured while retrieving the run");
+    res.status(500).send("An error occured while retrieving the run's information");
   }
 });
 
@@ -351,10 +402,15 @@ app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
     temperature,
     humidity,
     lux,
-    other
+    other,
    } = req.body;
   try {
+    console.log(is_constant_rpm);
     const id = await createRun(exp_id, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
+    const cage_order = JSON.parse(req.body.cage_order);
+    console.log("In create");
+    console.log(cage_order);
+    await createCageOrder(id, cage_order); // Could move in separate try catch to delete run if problem occurs here
     res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${id}` });
   } catch (err) {
     console.log(err);
@@ -410,3 +466,12 @@ app.delete('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) =
 app.listen(port, function () {
   console.log('App is listening on port ' + port);
 });
+
+const log_stuff = async () => {
+  const mice = await getMice();
+  console.log(mice);
+  const cages = await getCages();
+  console.log(cages);
+};
+
+log_stuff();

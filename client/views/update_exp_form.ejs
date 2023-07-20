@@ -16,16 +16,22 @@
     <label for="title">Title:</label><br>
     <input type="text" id="title" name="title"><br>
     
-    <input type="button" value="Paste cage info" id="pasteInfoBtn" class="popup-button">
-    <div id="pasteArea" style="display: none;">
-      <textarea id="pasteBox" rows="10" cols="30"></textarea>
-      <input type="button" value="Apply" id="applyPasteBtn" class="popup-button">
+    <div class="alert" id="cageWarning">
+      <strong>Trials exist for this cage</strong> Can't modify the cages for this experiment.
     </div>
+    <div id="cageDiv">
+      <input type="button" value="Paste cage info" id="pasteInfoBtn" class="popup-button">
+      <div id="pasteArea" style="display: none;">
+        <p>format : 'cage number' 'mouse id' 'zigosity'</p>
+        <textarea id="pasteBox" rows="10" cols="30"></textarea>
+        <input type="button" value="Apply" id="applyPasteBtn" class="popup-button">
+      </div>
 
-    <div class="widget-container">
-      <input type="button" value="Add row" id="addRowBtn" class="widget-button">
-      <input type="button" value="Delete selected rows" id="deleteRowsBtn" class="widget-button">
-      <div id="cageGrid"></div>
+      <div class="widget-container">
+        <input type="button" value="Add row" id="addRowBtn" class="widget-button">
+        <input type="button" value="Delete selected rows" id="deleteRowsBtn" class="widget-button">
+        <div id="cageGrid"></div>
+      </div>
     </div>
 
     <input type="submit" value="Save" class="popup-submit-button">
@@ -35,11 +41,18 @@
   <script>
     $(document).ready(function () {
       let dispatchUpdate = function(id) {
-        localStorage.setItem('expUpdate', new Date);
+        localStorage.setItem('expUpdate', {date : new Date, id });
       };
 
       let exp = <%- JSON.stringify(exp) %>;
       let cage_info = <%- JSON.stringify(cage_info) %>;
+      let nruns = <%- parseInt(nruns) %>;
+
+      if (nruns) {
+        $("#cageDiv").hide();
+      } else {
+        $("#cageWarning").hide();
+      }
 
       // Initialize the grid
       let source = {
@@ -177,11 +190,12 @@
             ucb_identifier: parseInt(row.ucb_identifier),
             zigosity: row.zigosity
           }));;
+          
 
           $.ajax({
             url: '/study/<%= study_id %>/experiment/' + exp.id,
             type: 'PUT',
-            data: {title, cage_info: new_info},
+            data: {title, cage_info: JSON.stringify(new_info)},
             success: function (data) {
               console.log("Data ", data);
               dispatchUpdate(data.id);

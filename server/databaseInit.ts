@@ -33,6 +33,7 @@ import { getDatabase } from './utils';
   )`);
   
   await db.run(`CREATE INDEX "cage_exp_id" ON "Cage" ("exp_id")`);
+  await db.run(`CREATE UNIQUE INDEX "cage_nb_exp_id" ON "Cage" ("cage_nb", "exp_id")`);
 
   await db.run(`
   CREATE TABLE "Mouse" (
@@ -40,7 +41,7 @@ import { getDatabase } from './utils';
     "cage_id" INTEGER,
     "ucb_identifier" INTEGER,
     "zigosity" VARCHAR,
-    FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id")
+    FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id") ON DELETE CASCADE
   )`);
   
   await db.run(`CREATE INDEX "mouse_cage_id" ON "Mouse" ("cage_id")`);
@@ -66,20 +67,20 @@ import { getDatabase } from './utils';
   CREATE TABLE "Run_Ordering" (
     "cage_id" INTEGER,
     "run_id" INTEGER,
-    "order" INTEGER,
+    "ordering" INTEGER,
     PRIMARY KEY ("cage_id", "run_id"),
     FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id"),
-    FOREIGN KEY ("run_id") REFERENCES "Run" ("id")
+    FOREIGN KEY ("run_id") REFERENCES "Run" ("id") ON DELETE CASCADE
   )`);
 
-  await db.run(`CREATE UNIQUE INDEX "run_ordering_index" ON "Run_Ordering" ("run_id", "order")`);
+  await db.run(`CREATE UNIQUE INDEX "run_ordering_index" ON "Run_Ordering" ("run_id", "ordering")`);
 
   await db.run(`
   CREATE TABLE "Trial" (
     "id" INTEGER PRIMARY KEY,
     "run_id" INTEGER,
     "trial_nb" INTEGER,
-    FOREIGN KEY ("run_id") REFERENCES "Run" ("id")
+    FOREIGN KEY ("run_id") REFERENCES "Run" ("id") ON DELETE CASCADE
   )`);
 
   await db.run(`CREATE UNIQUE INDEX "trial_index" ON "Trial" ("run_id", "trial_nb")`);

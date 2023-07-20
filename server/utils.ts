@@ -12,6 +12,9 @@ export const getDatabase = async (): Promise<Database> => {
             filename: dbPath,
             driver: sqlite3.Database,
         });
+
+        // Set foreign_keys pragma to ON
+        await dbInstance.run(`PRAGMA foreign_keys = ON;`);
     }
     
     return dbInstance;
@@ -31,6 +34,27 @@ export class NotFoundError extends Error {
     super(message);
     this.name = "NotFoundError";
   }
+}
+
+// Utility functions
+
+export function shuffleArray(inputArray) {
+    let array = [...inputArray]; // Create a copy of the input array
+    let currentIndex = array.length, temporaryValue, randomIndex;
+    
+    // While there remain elements to shuffle...
+    while (0 !== currentIndex) {
+        // Pick a remaining element...
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex -= 1;
+
+        // And swap it with the current element.
+        temporaryValue = array[currentIndex];
+        array[currentIndex] = array[randomIndex];
+        array[randomIndex] = temporaryValue;
+    }
+
+    return array;
 }
 
 // Study
@@ -110,6 +134,18 @@ export const deleteExperiment = async (id) => {
   }
 };
 
+export const countRunsWithTrialsExp = async (experimentId) => {
+  const db = await getDatabase();
+  const result = await db.get(`
+    SELECT COUNT(*)
+    FROM Run r
+    JOIN Trial t ON r.id = t.run_id
+    WHERE r.experiment_id = ?
+  `, experimentId);
+
+  return result['COUNT(*)'];
+};
+
 // Cage
 
 export const getCages = async () => {
@@ -159,6 +195,12 @@ export const deleteCage = async (id) => {
   if (result.changes === 0) {
     throw new NotFoundError(`No cage found with id ${id}`);
   } 
+};
+
+export const deleteAllCagesExp = async (expId) => {
+  const db = await getDatabase();
+  const result = await db.run(`DELETE FROM "Cage" WHERE exp_id = ?`, expId);
+  return result.changes;
 };
 
 // Mouse
@@ -273,11 +315,116 @@ export const deleteRun = async (id) => {
   }
 };
 
+export const getTrialsAndRecords = async (run_id) => {
+  const db = await getDatabase();
+
+  const result = await db.all(`
+    SELECT Trial.id AS trial_id, Trial.trial_nb, Trial.trial_time, Trial_record.time_record, Trial_record.rpm_record, Trial_record.mouse_id
+    FROM Trial
+    INNER JOIN Trial_record ON Trial.id = Trial_record.trial_id
+    WHERE Trial.run_id = ?
+  `, run_id);
+
+  if (!result.length) {
+    throw new NotFoundError(`No trials or records found for run id ${run_id}`);
+  }
+
+  // Group trial records by trial id
+  const trials = result.reduce((trials, record) => {
+    if (!trials[record.trial_id]) {
+      trials[record.trial_id] = {
+        trial_nb: record.trial_nb,
+        trial_time: record.trial_time,
+        records: []
+      };
+    }
+
+    trials[record.trial_id].records.push({
+      time_record: record.time_record,
+      rpm_record: record.rpm_record,
+      mouse_id: record.mouse_id,
+    });
+
+    return trials;
+  }, {});
+
+  return Object.values(trials);
+};
+
 // Run_Ordering
 
 export const getRunOrderings = async () => {
   const db = await getDatabase();
   return await db.all(`SELECT * FROM "Run_Ordering"`);
+};
+
+export const getCageOrder = async (run_id) => {
+  const db = await getDatabase();
+
+  const result = await db.all(`
+    SELECT Cage.cage_nb
+    FROM Run_Ordering
+    INNER JOIN Cage ON Run_Ordering.cage_id = Cage.id
+    WHERE Run_Ordering.run_id = ?
+    ORDER BY Run_Ordering.ordering
+  `, run_id);
+
+  // Extract the cage numbers from the result
+  const cageOrder = result.map(item => parseInt(item.cage_nb));
+
+  return cageOrder;
+};
+
+export const createCageOrder = async (run_id, order) => {
+  console.log("In utils");
+  console.log(order);
+  console.log(order[0]);
+  const db = await getDatabase();
+
+  // Fetch experiment id for given run id
+  const run = await db.get(`
+    SELECT experiment_id 
+    FROM Run 
+    WHERE id = ?
+  `, run_id);
+
+  if (!run) {
+    throw new NotFoundError(`No run found with id ${run_id}`);
+  }
+
+  // Start a transaction
+  await db.run('BEGIN');
+
+  try {
+    for (let i = 0; i < order.length; i++) {
+      const cage_nb = order[i];
+
+      // Find the cage_id associated with the cage_nb and experiment_id
+      const cage = await db.get(`
+        SELECT Cage.id
+        FROM Cage
+        INNER JOIN Experiment ON Cage.exp_id = Experiment.id
+        WHERE Cage.cage_nb = ? AND Experiment.id = ?
+      `, cage_nb, run.experiment_id);
+
+      if (!cage) {
+        throw new NotFoundError(`No cage found with cage_nb ${cage_nb} for experiment id ${run.experiment_id}`);
+      }
+
+      // Create a new Run_Ordering record
+      await db.run(`
+        INSERT INTO Run_Ordering ("cage_id", "run_id", "ordering")
+        VALUES (?, ?, ?)
+      `, cage.id, run_id, i + 1);
+    }
+
+    // Commit the transaction
+    await db.run('COMMIT');
+  } catch (error) {
+    // If an error occurred, rollback the transaction
+    await db.run('ROLLBACK');
+    throw error;
+  }
 };
 
 export const getRunOrdering = async (cageId, runId) => {
@@ -287,7 +434,7 @@ export const getRunOrdering = async (cageId, runId) => {
 
 export const createRunOrdering = async (cageId, runId, order) => {
   const db = await getDatabase();
-  await db.run(`INSERT INTO "Run_Ordering" (cage_id, run_id, order) VALUES (?, ?, ?)`, cageId, runId, order);
+  await db.run(`INSERT INTO "Run_Ordering" ("cage_id", "run_id", "ordering") VALUES (?, ?, ?)`, cageId, runId, order);
 };
 
 export const deleteRunOrdering = async (cageId, runId) => {

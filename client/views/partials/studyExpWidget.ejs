@@ -354,7 +354,7 @@ $(document).ready(function () {
                 data: { title },
                 success: function (data) {
                     window.dispatchEvent(expCreateEvent({ id: data.id, study_id : study_id }));
-                    window.open('/study/' + study_id + '/experiment/' + data.id, 'Update Exp form' + exp_id, 'width=1250,height=750');
+                    window.open('/study/' + study_id + '/experiment/' + data.id, 'Update Exp form' + data.id, 'width=750,height=750');
                 },
                 error: function(jqXHR)
                 {
@@ -372,7 +372,7 @@ $(document).ready(function () {
     $('#updateExpBtn').click(function () {
         let study_id = $('#jqxListBoxStudy').jqxListBox('getSelectedItem').value;
         let exp_id = $('#jqxListBoxExp').jqxListBox('getSelectedItem').value;
-        window.open('/study/' + study_id + '/experiment/' + exp_id, 'Update Exp form' + exp_id, 'width=500,height=300');
+        window.open('/study/' + study_id + '/experiment/' + exp_id, 'Update Exp form' + exp_id, 'width=750,height=750');
     });
 
     $('#deleteExpBtn').click(function () {
