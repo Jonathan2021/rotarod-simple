@@ -20,8 +20,8 @@ import {
   createCageOrder,
   deleteAllCagesExp,
   getMice,
-  getCage,
   getCages,
+  updateTrial, createTrial, updateTrialRecord, createTrialRecord, deleteTrial, deleteTrialRecord, getTrials, getTrialRecords, deleteAllTrials, deleteAllTrialRecords
 } from './server/utils'
 
 declare module 'express-session' {
@@ -292,7 +292,7 @@ app.put('/study/:study_id/experiment/:exp_id', async (req, res) => {
       const cage_info = JSON.parse(req.body.cage_info);
       await updateExperimentCages(exp_id, cage_info);
     }
-    res.json({ exp_id });
+    res.json({ id: exp_id });
   } catch (err) {
     console.log(err);
     if(err instanceof NotFoundError) {
@@ -331,7 +331,7 @@ const getCageMice = async (expId: number) => {
     if(!dict[item.cage_nb]) {
       dict[item.cage_nb] = [];
     }
-    dict[item.cage_nb].push(item.ucb_identifier);
+    dict[item.cage_nb].push({id: item.mouse_id, number: item.ucb_identifier});
   }
   return dict;
 };
@@ -362,34 +362,148 @@ app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
       res.status(404).send("Couldn't find the requested run");
     } else {
       const cages = await getCageMice(parseInt(exp_id));
-      const cage_order = await getCageOrder(run_id);
+      let cage_order = await getCageOrder(run_id);
+      console.log("CAGE ORDER WOOOW ", cage_order);
+      // FIXME Hacky solution to someone modifying cages for an experiment with existing runs. Cage_order are deleted and now a new one needs to be done.
+      if (!cage_order.length)
+      {
+        cage_order = shuffleArray(Object.keys(cages)).map(Number);
+        if (cage_order.length)
+          await createCageOrder(run_id, cage_order);
+      }
+
       const trials = await getTrialsAndRecords(run_id);
+      console.log("TrialsAndRecords RAW ", trials);
       let only_trials = [];
-      let trial_records = []
+      let trial_records = {};
       for (let trial_id of Object.keys(trials)) {
           only_trials.push({
             id: trial_id,
             trial_time: trials[trial_id].trial_time,
+            trial_nb: trials[trial_id].trial_nb,
             exists: true,
           });
-          let trial_record = [];
+          let cur_records = {};
           for (let record of trials[trial_id].records) {
-            trial_record.push({
-              mouse_id: record.mouse_id,
-              time_record: record.time_record,
-              rpm_record: record.rpm_record,
-              exists: true
-            });
+            if (record.mouse_id) {
+              cur_records[record.mouse_id] = {
+                time_record: record.time_record ? record.time_record : "",
+                rpm_record: record.rpm_record ? record.rpm_record : "",
+                exists: true
+              };
+            }
           }
-          trial_records.push({trial_id, records: trial_record });
+          trial_records[trial_id] = cur_records;
     }
-    res.render('run_form', {study_id, exp_id, run: JSON.stringify(run), cages : JSON.stringify(cages), cage_order: JSON.stringify(cage_order), trials: JSON.stringify(only_trials), trial_records : JSON.stringify(trial_records)});
+    console.log("Run ", run);
+    console.log("Cages ", cages);
+    console.log("Cage order", cage_order);
+    console.log("Only trials", only_trials);
+    console.log("Trial records", trial_records);
+    res.render('run_form', {study_id, exp_id, run: run, cages : JSON.stringify(cages), cage_order: JSON.stringify(cage_order), trials: JSON.stringify(only_trials), trial_records : JSON.stringify(trial_records)});
   }
   } catch (err) {
     console.log(err);
     res.status(500).send("An error occured while retrieving the run's information");
   }
 });
+
+const processRunTrials = async (run_id, trials, trial_records) => {
+  console.log("Processing : ");
+  console.log("trials : ", trials);
+  console.log("records : ", trial_records);
+
+  // Fetch existing trials and trial records for the given run
+  const existingTrialsAndRecords = await getTrialsAndRecords(run_id);
+
+  console.log("We have the following existing ", existingTrialsAndRecords);
+  // Mapping existing trials for easy lookup
+  const existingTrialsMap = {};
+  Object.keys(existingTrialsAndRecords).forEach(trial_id => {
+    existingTrialsMap[trial_id] = existingTrialsAndRecords[trial_id];
+  });
+
+  let count = 0;
+  // Process Trials
+  console.log("Creating and updating Trials");
+  let real_id;
+  for (const trial of trials) {
+    console.log("Create Update number ", ++count);
+    if (trial.exists) {
+      if (!existingTrialsMap[trial.id]) {
+        throw new NotFoundError(`No existing trial found with id ${trial.id}`);
+      }
+      await updateTrial(trial.id, trial.trial_nb, trial.trial_time);
+    } else {
+      real_id = await createTrial(run_id, trial.trial_nb, trial.trial_time);
+      console.log(`real : ${real_id} vs fake ${trial.id}`);
+      if (real_id != parseInt(trial.id)) {
+        console.log("Replacing");
+        trial_records[real_id] = trial_records[trial.id];
+        delete trial_records[trial.id];
+        trial.id = real_id;
+      }
+    }
+  }
+
+  // Mapping existing trial records for easy lookup
+  const existingTrialRecordsMap = {};
+  Object.keys(existingTrialsAndRecords).forEach(trial_id => {
+    existingTrialsAndRecords[trial_id].records.forEach(record => {
+      existingTrialRecordsMap[`${trial_id}_${record.mouse_id}`] = record;
+    });
+  });
+
+  // Process Trial Records
+  console.log("State before record updates");
+  const trials_exist = await getTrials();
+  console.log(trials_exist);
+  console.log("trials : ", trials);
+  count = 0;
+  console.log("Creating and updating Records");
+  for (const trialId in trial_records) {
+    for (const mouseId in trial_records[trialId]) {
+      console.log("Create Update number ", ++count);
+      const record = trial_records[trialId][mouseId];
+      const key = `${trialId}_${mouseId}`;
+      console.log(key);
+      if (record.exists) {
+        if (!existingTrialRecordsMap[key]) {
+          throw new NotFoundError(`No existing trial record found for trial_id ${trialId} and mouse_id ${mouseId}`);
+        }
+        const timeRecord = record.time_record || null;
+        const rpmRecord = record.rpm_record || null;
+        await updateTrialRecord(trialId, mouseId, timeRecord, rpmRecord);
+      } else {
+        const timeRecord = record.time_record || null;
+        const rpmRecord = record.rpm_record || null;
+        await createTrialRecord(trialId, mouseId, timeRecord, rpmRecord);
+      }
+    }
+  }
+
+  // Identify and delete trial_records that were removed
+  console.log("Deleting Records");
+  for (const key in existingTrialRecordsMap) {
+    const [trialId, mouseId] = key.split('_');
+    if (!trial_records[trialId] || !trial_records[trialId][mouseId]) {
+      console.log("Deleting Record : (", trialId, "", mouseId, ")");
+      await deleteTrialRecord(trialId, mouseId);
+    }
+  }
+
+  // Identify and delete trials that were removed
+  console.log("State before deletion");
+  console.log("trials : ", trials);
+  console.log("records : ", trial_records);
+  console.log("Deleting Trials");
+  for (const existingTrialId in existingTrialsMap) {
+    if (!trials.some(trial => trial.id == parseInt(existingTrialId))) {
+      console.log("Deleting Trial :", existingTrialId);
+      await deleteTrial(existingTrialId);
+    }
+  }
+};
 
 // Creating a run
 app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
@@ -403,14 +517,17 @@ app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
     humidity,
     lux,
     other,
+    cage_order,
+    trials,
+    trial_records
    } = req.body;
   try {
     console.log(is_constant_rpm);
     const id = await createRun(exp_id, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
-    const cage_order = JSON.parse(req.body.cage_order);
     console.log("In create");
     console.log(cage_order);
     await createCageOrder(id, cage_order); // Could move in separate try catch to delete run if problem occurs here
+    await processRunTrials(id, JSON.parse(trials), JSON.parse(trial_records));
     res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${id}` });
   } catch (err) {
     console.log(err);
@@ -429,17 +546,20 @@ app.put('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
     temperature,
     humidity,
     lux,
-    other
+    other,
+    trials,
+    trial_records
    } = req.body;
   try {
     await updateRun(run_id, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
+    await processRunTrials(run_id, JSON.parse(trials), JSON.parse(trial_records));
     res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${run_id}` });
   } catch (err) {
     console.log(err);
     if(err instanceof NotFoundError) {
       res.status(404).send(err.message);
     } else {
-      res.status(500).send("An error occured while updating the run");
+      res.status(500).send("An error occured while updating the run : " + err.message);
     }
   }
 });
@@ -472,6 +592,12 @@ const log_stuff = async () => {
   console.log(mice);
   const cages = await getCages();
   console.log(cages);
+  //await deleteAllTrialRecords();
+  //await deleteAllTrials();
+  const trials = await getTrials();
+  console.log(trials);
+  const trial_records = await getTrialRecords();
+  console.log(trial_records);
 };
 
 log_stuff();

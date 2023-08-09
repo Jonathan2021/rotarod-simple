@@ -1,13 +1,5 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <link rel="stylesheet" href="https://jqwidgets.com/public/jqwidgets/styles/jqx.base.css">
-  <link rel="stylesheet" href="https://jqwidgets.com/public/jqwidgets/styles/jqx.metro.css">
-  <link rel="stylesheet" type="text/css" href="/assets/css/popup.css">
-  <link rel="stylesheet" href="/assets/css/widget.css">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://jqwidgets.com/public/jqwidgets/jqx-all.js"></script>
-</head>
+<%- include('partials/header.ejs') %>
 <body>
 <div class="popup-window">
   <h2 id="formTitle"></h2>
@@ -17,7 +9,7 @@
     <input type="text" id="title" name="title"><br>
     
     <div class="alert" id="cageWarning">
-      <strong>Trials exist for this cage</strong> Can't modify the cages for this experiment.
+      <strong>Trials exist for this experiment</strong> Can't modify the cages for this experiment.
     </div>
     <div id="cageDiv">
       <input type="button" value="Paste cage info" id="pasteInfoBtn" class="popup-button">
@@ -41,7 +33,8 @@
   <script>
     $(document).ready(function () {
       let dispatchUpdate = function(id) {
-        localStorage.setItem('expUpdate', {date : new Date, id });
+        console.log("Dispatched the event with id ", id);
+        localStorage.setItem('expUpdate', JSON.stringify({date : new Date, id }));
       };
 
       let exp = <%- JSON.stringify(exp) %>;

@@ -260,8 +260,10 @@ $(document).ready(function () {
     });
     
     window.addEventListener('storage', function(e){
+        console.log("Storage changed : ", e.key);
         if (e.key === "expUpdate")
         {
+            console.log("refreshing");
             let study_id = $("#jqxListBoxStudy").jqxListBox("getSelectedItem").value;
             refreshExp(study_id).catch(error => console.error(error));
         }

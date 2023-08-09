@@ -7,7 +7,7 @@
 
     <form id="runForm" method="post">
         <label for="is_constant_rpm">Constant RPM:</label>
-        <input type="checkbox" id="is_constant_rpm" name="is_constant_rpm" <%= (run && run.is_constant_rpm ==1) ? 'checked' : '' %>>
+        <input type="checkbox" id="is_constant_rpm" name="is_constant_rpm" <%= (run && run.is_constant_rpm == 1) ? 'checked' : '' %>>
 
         <div id="rpm_field" style="<%= !(run && run.is_constant_rpm == 1) ? 'display: none;' : '' %>">
             <label for="rpm">Value of constant RPM:</label>
@@ -37,23 +37,59 @@
         <input type="text" id="lux" name="lux" value="<%= run ? run.lux : '' %>">
 
         <label for="other">Other:</label>
-        <textarea id="other" rows="10" cols="30" value="<%= run ? run.other : '' %>"></textarea>
+        <textarea id="other" rows="10" cols="30"><%= run ? run.other : '' %></textarea>
         <!-- <input type="text" id="other" name="other" value="<%= run ? run.other : '' %>"> -->
 
+        <h3 id="orderInfo"></h3>
+        <div>
+        <button id="startTrial">Start new Trial</button>
+        </div>
+        <div>
+        <select id="selectTrial"></select>
+        <button id="modifyTrial">Modify Trial</button>
+        <button id="deleteTrial">Delete Trial</button>
+        </div>
+
+        <div id="trialDialog">
+            <h3 id="cageTitle">Cage 4</h3>
+            <div id="miceRecords"></div>
+            <button id="previousButton" disabled>previous</button>
+            <button id="nextButton">next</button>
+            <button id="saveExitButton">Save and Exit</button>
+        </div>
+
+        <div id="trialDialogInput" title="Enter Trial Details">
+        <p>Trial Time:</p>
+        <input type="text" id="trialTimeInput" pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]">
+        <p>Trial Number:</p>
+        <input type="text" id="trialNbInput">
+        </div>
         <button class="form-button" type="submit">Save Run</button>
     </form>
     </div>
+    <div id="jqxGridTrials" class="grid-container"></div>
     <script>
+        let trials;
+        let trial_records;
+        let cageMice;
+        let cage_order;
         $(document).ready(function() {
+
+        $("#trialDialogInput").hide();
+
         let exp_id = <%- exp_id %>;
-        let cageMice = JSON.parse(<%- JSON.stringify(cages) %>);
-        let cage_order = <%- cage_order %>;
-        let trials = <%- JSON.stringify(trials) %>;
-        let trial_records = <%- JSON.stringify(trial_records) %>;
-        
+        cageMice = JSON.parse(<%- JSON.stringify(cages) %>);
+        cage_order = <%- cage_order %>;
+        trials = JSON.parse(<%- JSON.stringify(trials) %>);
+        trial_records = JSON.parse(<%- JSON.stringify(trial_records) %>);
+
         window.addEventListener('storage', function(e){
-            if (e.key === "expUpdate" && e.newValue.id == exp_id)
-                location.reload()
+            console.log("RELOADING !!!!")
+            if (e.key === "expUpdate") {
+                let newVal = JSON.parse(e.newValue);
+                if (newVal.id == exp_id)
+                    location.reload();
+            }
         });
 
         $("#orderInfo").text("Cage order: " + cage_order.join(', '));
@@ -65,6 +101,301 @@
                 $('#rpm_field').hide();
             }
         });
+
+        let currentCageIndex = 0;
+        let currentTrialId = null;
+
+         $("#trialDialog").dialog({
+            autoOpen: false,
+            modal: true,
+            width: 400,
+            close: function(event, ui) {
+                populateTrialDropdown();
+                createGrid();
+            }
+        });
+
+        function getNewTrialIdandNb() {
+            let max_trial_nb = trials.length > 0 ? Math.max.apply(null, trials.map(function(trial) { return trial.trial_nb; })) : 0;
+            let max_trial_id = trials.length > 0 ? Math.max.apply(null, trials.map(function(trial) { return trial.id; })) : 0;
+            return {id: max_trial_id + 1, nb : max_trial_nb + 1};
+        }
+
+        function ValidateTrialMeta () {
+            const pattern = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            const value = $("#trialTimeInput").val();
+
+            if (!pattern.test(value) && value !== '') {
+                alert("Please enter time in hh:mm format");
+                $("#trialTimeInput").addClass("invalid-input");
+                return false;
+            }
+            return true;
+        }
+        
+        $("#startTrial").click(function(e) {
+            e.preventDefault();
+            let trial_info = getNewTrialIdandNb();
+            let trial_id = trial_info.id;
+            let trial_nb = trial_info.nb;
+            $("#trialTimeInput").val(getCurrentTime());
+            $("#trialNbInput").val(trial_nb);
+
+            $("#trialDialogInput").dialog({
+                buttons: {
+                    "Save Meta": function() {
+                        if (!ValidateTrialMeta())
+                            return;
+                        let timePrompt = $("#trialTimeInput").val();
+                        trial_nb = $("#trialNbInput").val();
+                        trials.push({ id: trial_id, trial_nb: trial_nb, exists: false, trial_time: timePrompt });
+                        trial_records[trial_id] = {};
+                        currentTrialId = trial_id;
+                        currentCageIndex = 0;
+                        showCageDetails(trial_id);
+                        $(this).dialog("close");
+                    },
+                    "Cancel": function() {
+                        $(this).dialog("close");
+                    }
+                },
+                close: function () {
+                    $("#trialTimeInput").removeClass("invalid-input");
+                }
+            });
+        });
+
+        function populateTrialDropdown() {
+            $("#selectTrial").empty();
+            trials.forEach(function(trial) {
+                $("#selectTrial").append($('<option>', {
+                    value: trial.id,
+                    text: 'Trial ' + trial.trial_nb
+                }));
+            });
+        }
+        populateTrialDropdown();
+
+        $("#modifyTrial").click(function(e) {
+            e.preventDefault();
+            currentTrialId = $("#selectTrial").val(); // Modifying an existing trial
+
+            if (currentTrialId) {
+                let trial = trials.find(t => t.id == currentTrialId);
+                $("#trialTimeInput").val(trial.trial_time);
+                $("#trialNbInput").val(trial.trial_nb);
+
+                $("#trialDialogInput").dialog({
+                    buttons: {
+                        "Save Meta": function() {
+                            if (!ValidateTrialMeta())
+                                return;
+                            trial.trial_time = $("#trialTimeInput").val();
+                            trial.trial_nb = $("#trialNbInput").val();
+                            currentCageIndex = 0;
+                            showCageDetails(currentTrialId);
+                            $(this).dialog("close");
+                        },
+                        "Cancel": function() {
+                            $(this).dialog("close");
+                        }
+                    },
+                    close: function () {
+                        $("#trialTimeInput").removeClass("invalid-input");
+                    }
+                });
+            } else {
+                alert("Please select a valid trial to modify.");
+            }
+        });
+        $("#deleteTrial").click(function(e) {
+            trial_id = $("#selectTrial").val(); // Modifying an existing trial
+            if (confirm("Are you sure you want to delete this Trial and its associated records ?"))
+            {
+                trials = trials.filter(a => a.id != parseInt(trial_id));
+                delete trial_records[trial_id];
+                populateTrialDropdown();
+                createGrid();
+            }
+        });
+
+        $("#nextButton").click(function() {
+            saveCageDetails(currentTrialId);
+            if(currentCageIndex === cage_order.length - 1) {
+                $("#trialDialog").dialog("close");
+                return;
+            }
+            currentCageIndex++;
+            showCageDetails(currentTrialId);
+        });
+
+        $("#previousButton").click(function() {
+            saveCageDetails(currentTrialId);
+            currentCageIndex--;
+            showCageDetails(currentTrialId);
+        });
+
+        $("#saveExitButton").click(function() {
+            saveCageDetails(currentTrialId);
+            $("#trialDialog").dialog("close");
+        });
+
+        function showCageDetails(trial_id) {
+            trial_nb = trials.find(t => t.id == trial_id).trial_nb;
+            $("#miceRecords").empty();
+            let cageNumber = cage_order[currentCageIndex];
+            $("#cageTitle").text('Cage ' + cageNumber);
+            let mice = cageMice[cageNumber];
+
+            let secondsValue;
+            let rpmValue;
+            mice.forEach(function(mouse) {
+                secondsValue = "";
+                rpmValue = $('#is_constant_rpm').is(":checked") ? $('#rpm').val() : "";
+                mouse_id = mouse.id;
+                mouse_nb = mouse.number;
+                if (trial_id in trial_records && mouse_id in trial_records[trial_id])
+                {
+                    let existingRecord = trial_records[trial_id][mouse_id];
+                    secondsValue = existingRecord.time_record;
+                    rpmValue =  existingRecord.rpm_record;
+                }
+                let mouseHtml = '<div>- mouse ' + mouse_nb + ' seconds: <input type="text" class="secondsField" data-mouseid="' + mouse_id + '" value="' + secondsValue + '"> rpm: <input type="text" class="rpmField" data-mouseid="' + mouse_id + '" value="' + rpmValue + '"></div>';
+                $("#miceRecords").append(mouseHtml);
+            });
+
+            $("#previousButton").prop('disabled', currentCageIndex === 0);
+            $("#nextButton").prop('disabled', currentCageIndex === cage_order.length - 1);
+            //$("#nextButton").text(currentCageIndex === cage_order.length - 1 ? 'end' : 'next');
+
+            $("#trialDialog").dialog("open");
+        }
+
+        function saveCageDetails(trial_id = null) {
+            trial_nb = trials.find(t => t.id == trial_id).trial_nb;
+            console.log("Saving trial", trial_nb);
+            let cageNumber = cage_order[currentCageIndex];
+            let mice = cageMice[cageNumber];
+
+            mice.forEach(function(mouse) {
+                mouse_id = mouse.id;
+                let seconds = $(".secondsField[data-mouseid='" + mouse_id + "']").val();
+                let rpm = $(".rpmField[data-mouseid='" + mouse_id + "']").val();
+                if (rpm !== "" || seconds !== "") {
+                    if (!(mouse_id in trial_records[trial_id])) {
+                        trial_records[trial_id][mouse_id] = {exists: false};
+                    }
+                    trial_records[trial_id][mouse_id]["time_record"] = seconds;
+                    trial_records[trial_id][mouse_id]["rpm_record"] = rpm;
+                }
+            });
+        }
+
+        // jqxGrid Part
+        function createGrid() {
+            var columns = [{ text: 'Mice', datafield: 'mouse', width:"15%"}];
+
+            const sortedTrials = trials.slice().sort((a, b) => {
+                const timeA = a.trial_time.split(":");
+                const timeB = b.trial_time.split(":");
+                return timeA[0] * 60 + +timeA[1] - (timeB[0] * 60 + +timeB[1]);
+            });
+
+            // Add columns for each trial
+            sortedTrials.forEach(function(trial) {
+            columns.push({ text: "Trial " + trial.trial_nb + ' (' + trial.trial_time + ') - TIME', datafield: 'trial_' + trial.id + '_time' , cellsclassname: 'wrap-text', editable: true});
+            columns.push({ text: 'RPM', datafield: 'trial_' + trial.id + '_rpm', cellsclassname: 'wrap-text', editable: true});
+            });
+
+            var data = [];
+
+            for (cage of cage_order) {
+                let cage_mice = cageMice[cage];
+                for (mouse of cage_mice) {
+                    let mouse_id = mouse.id;
+                    let mouse_nb = mouse.number;
+                    var rowData = {mouse: 'Mouse ' + mouse_nb + " (Cage " + cage + ')', mouse_id: mouse_id};
+                    for (trial_id of Object.keys(trial_records)) {
+                        let rpms;
+                        let secs;
+                        if (trial_records[trial_id][mouse_id]) {
+                            rpms = trial_records[trial_id][mouse_id]["rpm_record"];
+                            secs = trial_records[trial_id][mouse_id]["time_record"];
+                        }
+                        else {
+                            rpms = "";
+                            secs = "";
+                        }
+                        rowData['trial_' + trial_id + '_time'] = secs;
+                        rowData['trial_' + trial_id + '_rpm'] = rpms;
+                    }
+                    data.push(rowData);
+                }
+            }
+
+            var source = {
+            datatype: 'json',
+            datafields: [
+                { name: 'mouse' }, 
+                { name: 'mouse_id' }, 
+                ...columns.slice(1).map(function(column) { 
+                return { name: column.datafield };
+                })
+            ],
+            localdata: data
+            };
+
+            var dataAdapter = new $.jqx.dataAdapter(source);
+
+            $("#jqxGridTrials").jqxGrid({
+            width: '100%',
+            source: dataAdapter,
+            columns: columns,
+            columnsresize: true,
+            editable:true
+            });
+
+            $("#jqxGridTrials").on('cellendedit', function(event) {
+                // event arguments
+                var args = event.args;
+                // column data field
+                var dataField = args.datafield;
+                // row's bound index
+                var rowBoundIndex = args.rowindex;
+                // cell new value
+                var value = args.value;
+                // row's data
+                var rowData = args.row;
+
+                // Extract mouse_id and trial_id based on the dataField
+                var mouse_id = rowData.mouse_id;
+                var trial_id = dataField.split('_')[1]; // Assuming the dataField is in the form 'trial_TRIALID_something'
+
+                // Update trial_records based on the modified cell
+                if (!(mouse_id in trial_records[trial_id])) {
+                    trial_records[trial_id][mouse_id] = {exists: false};
+                }
+                console.log(dataField);
+                console.log(mouse_id);
+                console.log(trial_id);
+                console.log(value);
+                if (dataField.endsWith('_time')) {
+                    trial_records[trial_id][mouse_id]["time_record"] = value;
+                } else if (dataField.endsWith('_rpm')) {
+                    trial_records[trial_id][mouse_id]["rpm_record"] = value;
+                }
+            });
+        }
+
+        createGrid();
+        
+
+        function getCurrentTime() {
+            let date = new Date();
+            let hours = date.getHours().toString().padStart(2, '0');
+            let minutes = date.getMinutes().toString().padStart(2, '0');
+            return hours + ':' + minutes;
+        }
 
         $('#runForm').on('submit', function(e) {
             e.preventDefault(); // Prevent the default form submission
@@ -89,6 +420,8 @@
                 humidity: $('#humidity').val(),
                 lux: $('#lux').val(),
                 other: $('#other').val(),
+                trials: JSON.stringify(trials),
+                trial_records: JSON.stringify(trial_records)
             };
             
             if (!run)
@@ -101,11 +434,10 @@
                 data: jsonObject,
                 success: function(data) {
                     if (data.redirect)
-                        //window.location.href = data.redirect;
+                        window.location.href = data.redirect;
                 },
                 error: function (jqXHR) {
-                    let json = JSON.parse(jqXHR.responseText);
-                    let errorMessage = json.error;
+                    let errorMessage = jqXHR.responseText;
                     alert(errorMessage);
                 }
                 });

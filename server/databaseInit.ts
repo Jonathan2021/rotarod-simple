@@ -69,7 +69,7 @@ import { getDatabase } from './utils';
     "run_id" INTEGER,
     "ordering" INTEGER,
     PRIMARY KEY ("cage_id", "run_id"),
-    FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id"),
+    FOREIGN KEY ("cage_id") REFERENCES "Cage" ("id") ON DELETE CASCADE,
     FOREIGN KEY ("run_id") REFERENCES "Run" ("id") ON DELETE CASCADE
   )`);
 
@@ -80,6 +80,7 @@ import { getDatabase } from './utils';
     "id" INTEGER PRIMARY KEY,
     "run_id" INTEGER,
     "trial_nb" INTEGER,
+    "trial_time" TIMESTAMP,
     FOREIGN KEY ("run_id") REFERENCES "Run" ("id") ON DELETE CASCADE
   )`);
 

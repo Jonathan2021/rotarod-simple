@@ -58,3 +58,29 @@ html, body {
   background-color: #f44336;
   color: white;
 }
+
+#trialDialog {
+    display: none;
+}
+
+#miceRecords {
+    margin: 10px 0;
+}
+
+.secondsField, .rpmField {
+    width: 50px;
+}
+
+.wrap-text {
+  white-space: normal !important;
+  height: auto !important;
+}
+
+input:invalid {
+  border: 2px solid red;
+}
+
+.invalid-input {
+    border: 2px solid red;
+    background-color: #fdd;
+}

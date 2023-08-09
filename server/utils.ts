@@ -321,13 +321,9 @@ export const getTrialsAndRecords = async (run_id) => {
   const result = await db.all(`
     SELECT Trial.id AS trial_id, Trial.trial_nb, Trial.trial_time, Trial_record.time_record, Trial_record.rpm_record, Trial_record.mouse_id
     FROM Trial
-    INNER JOIN Trial_record ON Trial.id = Trial_record.trial_id
+    LEFT JOIN Trial_record ON Trial.id = Trial_record.trial_id
     WHERE Trial.run_id = ?
   `, run_id);
-
-  if (!result.length) {
-    throw new NotFoundError(`No trials or records found for run id ${run_id}`);
-  }
 
   // Group trial records by trial id
   const trials = result.reduce((trials, record) => {
@@ -348,7 +344,7 @@ export const getTrialsAndRecords = async (run_id) => {
     return trials;
   }, {});
 
-  return Object.values(trials);
+  return trials;
 };
 
 // Run_Ordering
@@ -454,15 +450,15 @@ export const getTrial = async (trialId) => {
   return await db.get(`SELECT * FROM "Trial" WHERE id = ?`, trialId);
 };
 
-export const createTrial = async (runId, trialNb) => {
+export const createTrial = async (runId, trialNb, trialTime) => {
   const db = await getDatabase();
-  const result = await db.run(`INSERT INTO "Trial" (run_id, trial_nb) VALUES (?, ?)`, runId, trialNb);
+  const result = await db.run(`INSERT INTO "Trial" (run_id, trial_nb, trial_time) VALUES (?, ?, ?)`, runId, trialNb, trialTime);
   return result.lastID;
 };
 
-export const updateTrial = async (id, runId, trialNb) => {
+export const updateTrial = async (id, trialNb, trialTime) => {
   const db = await getDatabase();
-  const result = await db.run(`UPDATE "Trial" SET run_id = ?, trial_nb = ? WHERE id = ?`, runId, trialNb, id);
+  const result = await db.run(`UPDATE "Trial" SET trial_nb = ?, trial_time = ? WHERE id = ?`, trialNb, trialTime, id);
   
   if (result.changes === 0) {
     throw new NotFoundError(`No trial found with id ${id}`);
@@ -476,6 +472,11 @@ export const deleteTrial = async (id) => {
   if (result.changes === 0) {
     throw new NotFoundError(`No trial found with id ${id}`);
   }
+};
+
+export const deleteAllTrials = async () => {
+  const db = await getDatabase();
+  await db.run(`DELETE FROM "Trial"`);
 };
 
 // Trial_record
@@ -503,4 +504,9 @@ export const updateTrialRecord = async (trialId, mouseId, timeRecord, rpmRecord)
 export const deleteTrialRecord = async (trialId, mouseId) => {
   const db = await getDatabase();
   await db.run(`DELETE FROM "Trial_record" WHERE trial_id = ? AND mouse_id = ?`, trialId, mouseId);
+};
+
+export const deleteAllTrialRecords = async () => {
+  const db = await getDatabase();
+  await db.run(`DELETE FROM "Trial_record"`);
 };
