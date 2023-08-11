@@ -11,6 +11,7 @@
         <input type="button" value="Add Experiment" id="addExpBtn" class="widget-button" />
         <input type="button" value="Update Experiment" id="updateExpBtn" class="widget-button"/>
         <input type="button" value="Delete Experiment" id="deleteExpBtn" class="widget-button"/>
+        <input type="button" value="Export to Excel" id="exportToExcelBtn" class="widget-button"/>
         <div id="jqxListBoxExp" , class="list-container"></div>
     </div>
     <div id="runDiv">
@@ -20,6 +21,10 @@
         <input type="button" value="Delete Run" id="deleteRunBtn" class="widget-button"/>
         <div id="jqxListBoxRun" , class="list-container"></div>
     </div>
+</div>
+
+<div id="runsDialog" title="Select Runs to Export">
+    <div id="jqxListBoxRunDialog"></div>
 </div>
 
 <script>
@@ -99,6 +104,7 @@ let refreshRun = function (study_id, exp_id) {
                 }
                 sourceRun.localdata = data;
                 $("#jqxListBoxRun").jqxListBox('refresh');
+                $("#jqxListBoxRunDialog").jqxListBox('refresh');
                 expChangeEvent(study_id, exp_id);
                 resolve();
             },
@@ -133,6 +139,89 @@ $(document).ready(function () {
         displayMember: "date_acclim",
         width: '100%',
         height: '100%'
+    });
+
+    $("#jqxListBoxRunDialog").jqxListBox({
+        source: dataAdapterRun,
+        displayMember: 'date_acclim',
+        valueMember: 'id',
+        checkboxes: true,
+        width: '200px',
+        height: '200px'
+    });
+
+
+    // Create the runs dialog
+    // Create the runs dialog
+    $("#runsDialog").dialog({
+        width: 250,
+        height: 250,
+        resizable: false,
+        modal: true,
+        autoOpen: false,
+        title: "Select Runs to Export",
+        open: function() {
+            $("#jqxListBoxRunDialog").jqxListBox('checkAll'); // Check all runs when dialog opens
+        },
+        buttons: {
+            "Export": function() {
+                // Retrieve the selected run IDs
+                const selectedRuns = $("#jqxListBoxRunDialog").jqxListBox('getCheckedItems').map(item => item.value);
+
+                // Trigger the Excel export for the selected runs
+                exportRunsToExcel(selectedRuns);
+
+                // Close the dialog
+                $(this).dialog('close');
+            },
+            "Cancel": function() {
+                $(this).dialog('close');
+            }
+        }
+    });
+
+    $("#exportToExcelBtn").on('click', function () {
+        // Open the runs dialog
+        $("#runsDialog").dialog('open');
+    });
+
+    // Function to handle the Excel export
+    function exportRunsToExcel(runIds) {
+        const exp_id = $('#jqxListBoxExp').jqxListBox('getSelectedItem').value;
+        fetch("/experiment/" + exp_id + "/export_runs_to_excel", {
+            method: "POST",
+            body: JSON.stringify({ runIds }),
+            headers: {
+                "Content-Type": "application/json"
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("An error occurred while exporting runs to Excel");
+                }
+
+                // Extract filename from the response headers if available
+                const contentDisposition = response.headers.get("Content-Disposition");
+                const filename = contentDisposition ? contentDisposition.split('filename=')[1] : 'runs.xlsx';
+
+                return response.blob().then(blob => {
+                    // Create a link element to download the Blob
+                    const link = document.createElement('a');
+                    link.href = window.URL.createObjectURL(blob);
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                });
+            })
+            .catch(error => {
+                console.error(error);
+            });
+    }
+
+    $("#exportToExcelBtn").on('click', function () {
+        // Open the runs dialog
+        $("#runsDialog").jqxWindow('open');
     });
 
     $('#updateBtnStudy, #deleteBtnStudy').attr('disabled', 'disabled');
@@ -188,11 +277,11 @@ $(document).ready(function () {
     }
 
     let enableButtonsExp = function() {
-        $('#updateExpBtn, #deleteExpBtn').removeAttr('disabled');
+        $('#updateExpBtn, #deleteExpBtn, #exportToExcelBtn').removeAttr('disabled');
     }
     
     let disableButtonsExp = function() {
-        $('#updateExpBtn, #deleteExpBtn').attr('disabled', 'disabled');
+        $('#updateExpBtn, #deleteExpBtn, #exportToExcelBtn').attr('disabled', 'disabled');
     }
 
     let enableButtonsRun = function() {
@@ -214,7 +303,9 @@ $(document).ready(function () {
             refreshExp(studyId).then(() => {}).catch((error) => { console.error(error) });
             enableButtonsStudy();
             $('#jqxListBoxExp').jqxListBox('clearSelection');
+            disableButtonsExp();
             showExp();
+            hideRun();
         }
         else {
             hideExp();
@@ -228,6 +319,7 @@ $(document).ready(function () {
             const item = $('#jqxListBoxExp').jqxListBox('getItem', event.args.index).originalItem;
             refreshRun(item.study_id, item.id);
             $('#jqxListBoxRun').jqxListBox('clearSelection');
+            disableButtonsRun();
             showRun();
         } else {
             hideRun();
@@ -289,7 +381,8 @@ $(document).ready(function () {
         }
         else
         {
-            alert("The study title can't be empty");
+            if (title === "")
+                alert("The study title can't be empty");
         }
     });
 
@@ -367,7 +460,8 @@ $(document).ready(function () {
         }
         else
         {
-            alert("The experiment title can't be empty");
+            if (title === "")
+                alert("The experiment title can't be empty");
         }
     });
 

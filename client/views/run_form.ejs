@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <%- include('partials/header.ejs') %>
 <body>
+    <div class="sticky-button">
+    <a href="/main">
+        <button>Back to Main Page</button>
+    </a>
+    </div>
+
     <div class="form-container">
     <h2><%= run ? 'Edit' : 'New' %> Run</h2>
     <h3>Linked to <a href="javascript:window.open('/study/<%= study_id %>/experiment/<%= exp_id %>', 'Update exp <%= exp_id %>', 'width=750, height=750')">the following experiment</a></h3>
@@ -109,6 +115,9 @@
             autoOpen: false,
             modal: true,
             width: 400,
+            beforeClose: function() {
+                saveCageDetails(currentTrialId);
+            },
             close: function(event, ui) {
                 populateTrialDropdown();
                 createGrid();
@@ -236,7 +245,7 @@
         });
 
         $("#saveExitButton").click(function() {
-            saveCageDetails(currentTrialId);
+            // Saving is actually handled in the beforeClose event of the dialog.
             $("#trialDialog").dialog("close");
         });
 
@@ -260,7 +269,7 @@
                     secondsValue = existingRecord.time_record;
                     rpmValue =  existingRecord.rpm_record;
                 }
-                let mouseHtml = '<div>- mouse ' + mouse_nb + ' seconds: <input type="text" class="secondsField" data-mouseid="' + mouse_id + '" value="' + secondsValue + '"> rpm: <input type="text" class="rpmField" data-mouseid="' + mouse_id + '" value="' + rpmValue + '"></div>';
+                let mouseHtml = '<div>- mouse <strong>' + mouse_nb + '</strong> seconds: <input type="text" class="secondsField" data-mouseid="' + mouse_id + '" value="' + secondsValue + '"> rpm: <input type="text" class="rpmField" data-mouseid="' + mouse_id + '" value="' + rpmValue + '"></div>';
                 $("#miceRecords").append(mouseHtml);
             });
 
@@ -285,6 +294,7 @@
                     if (!(mouse_id in trial_records[trial_id])) {
                         trial_records[trial_id][mouse_id] = {exists: false};
                     }
+                    console.log(`${mouse.number} ${seconds} seconds / ${rpm} rpms`);
                     trial_records[trial_id][mouse_id]["time_record"] = seconds;
                     trial_records[trial_id][mouse_id]["rpm_record"] = rpm;
                 }
@@ -381,6 +391,9 @@
                 console.log(value);
                 if (dataField.endsWith('_time')) {
                     trial_records[trial_id][mouse_id]["time_record"] = value;
+                    if (!trial_records[trial_id][mouse_id]["rpm_record"] && $('#is_constant_rpm').is(":checked")) {
+                        trial_records[trial_id][mouse_id]["rpm_record"] = $('#rpm').val();
+                    }
                 } else if (dataField.endsWith('_rpm')) {
                     trial_records[trial_id][mouse_id]["rpm_record"] = value;
                 }

@@ -275,7 +275,7 @@ export const getRuns = async () => {
 
 export const getRunsFromExperiment = async (expId) => {
   const db = await getDatabase();
-  return await db.all(`SELECT * FROM "Run" WHERE experiment_id = ? ORDER BY "date_acclim" DESC`, expId);
+  return await db.all(`SELECT * FROM "Run" WHERE experiment_id = ? ORDER BY "date_acclim" ASC`, expId);
 };
 
 export const getRun = async (runId) => {
@@ -428,6 +428,11 @@ export const getRunOrdering = async (cageId, runId) => {
   return await db.get(`SELECT * FROM "Run_Ordering" WHERE cage_id = ? AND run_id = ?`, cageId, runId);
 };
 
+export const getOrderingFromRun = async (runId) => {
+  const db = await getDatabase();
+  return await db.all(`SELECT * FROM "Run_Ordering" WHERE run_id = ? ORDER BY ordering ASC`, runId);
+};
+
 export const createRunOrdering = async (cageId, runId, order) => {
   const db = await getDatabase();
   await db.run(`INSERT INTO "Run_Ordering" ("cage_id", "run_id", "ordering") VALUES (?, ?, ?)`, cageId, runId, order);
@@ -443,6 +448,30 @@ export const deleteRunOrdering = async (cageId, runId) => {
 export const getTrials = async () => {
   const db = await getDatabase();
   return await db.all(`SELECT * FROM "Trial"`);
+};
+
+export const getTrialsFromRun = async (runId) => {
+  const db = await getDatabase();
+  return await db.all(`SELECT * FROM "Trial" WHERE run_id = ?`, runId);
+};
+
+export const getTrialsFromRunForMouse = async (runId, mouseId) => {
+  const db = await getDatabase();
+  const rows = await db.all(`SELECT tr.trial_id, tr.time_record, tr.rpm_record
+        FROM Trial_record AS tr
+        JOIN Trial AS t ON tr.trial_id = t.id
+        JOIN Run AS r ON t.run_id = r.id
+        WHERE tr.mouse_id = ? AND r.id = ?;`, mouseId, runId);
+
+  const result = {};
+  rows.forEach(row => {
+    result[row.trial_id] = {
+      time_record: row.time_record,
+      rpm_record: row.rpm_record
+    };
+  });
+
+  return result;
 };
 
 export const getTrial = async (trialId) => {
@@ -484,6 +513,11 @@ export const deleteAllTrials = async () => {
 export const getTrialRecords = async () => {
   const db = await getDatabase();
   return await db.all(`SELECT * FROM "Trial_record"`);
+};
+
+export const getRecordsFromTrial = async (trialId) => {
+  const db = await getDatabase();
+  return await db.all(`SELECT * FROM "Trial_record WHERE trial_id = ?"`, trialId);
 };
 
 export const getTrialRecord = async (trialId, mouseId) => {

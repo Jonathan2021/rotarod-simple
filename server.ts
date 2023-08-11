@@ -5,6 +5,8 @@ import { setUserAuth, getUserAcc } from './server/controllers/auth';
 import fs from 'fs';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
+import Excel from 'exceljs';
+import os from "os";
 
 import {
   isUniqueConstraintError, NotFoundError,
@@ -21,7 +23,8 @@ import {
   deleteAllCagesExp,
   getMice,
   getCages,
-  updateTrial, createTrial, updateTrialRecord, createTrialRecord, deleteTrial, deleteTrialRecord, getTrials, getTrialRecords, deleteAllTrials, deleteAllTrialRecords
+  updateTrial, createTrial, updateTrialRecord, createTrialRecord, deleteTrial, deleteTrialRecord, getTrials, getTrialRecords, deleteAllTrials, deleteAllTrialRecords,
+  getTrialsFromRun, getRecordsFromTrial, getMouse, getRunOrdering, getOrderingFromRun, getCage, getMiceFromCage, getTrialsFromRunForMouse, getStudy
 } from './server/utils'
 
 declare module 'express-session' {
@@ -526,7 +529,7 @@ app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
     const id = await createRun(exp_id, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
     console.log("In create");
     console.log(cage_order);
-    await createCageOrder(id, cage_order); // Could move in separate try catch to delete run if problem occurs here
+    await createCageOrder(id, JSON.parse(cage_order)); // Could move in separate try catch to delete run if problem occurs here
     await processRunTrials(id, JSON.parse(trials), JSON.parse(trial_records));
     res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${id}` });
   } catch (err) {
@@ -582,6 +585,204 @@ app.delete('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) =
   }
 });
 
+// Excel logic
+
+async function getExcelFilePath(exp_id) {
+  const tempDir = os.tmpdir();
+  const exp = await getExperiment(exp_id);
+  const fileName = `export_run_${exp.title.replace(/ /g,"_")}_${Date.now()}.xlsx`;
+
+  //return path.join('C:/Users/e637792/rotarod-simple/excel/', fileName);
+  return path.join(tempDir, fileName);
+}
+
+function isNumber(value) {
+  return typeof value === 'number' && !isNaN(value) || 
+         !isNaN(parseFloat(value)) && isFinite(value);
+}
+
+interface TrialRecord {
+  time_record: number;
+  rpm_record: number;
+}
+
+const average = array => array.reduce((a, b) => a + b) / array.length;
+
+function formatWorksheet(worksheet) {
+  // Initialize column widths
+  const columnWidths = [];
+
+  // Iterate through the rows and cells to set alignment and calculate column widths
+  worksheet.eachRow((row, rowNumber) => {
+    row.eachCell((cell, colNumber) => {
+      cell.alignment = { horizontal: 'center', wrapText: true };
+
+      // Get the cell's length and update the corresponding column width if it's larger
+      const cellLength = cell.text.length;
+      columnWidths[colNumber - 1] = Math.max(columnWidths[colNumber - 1] || 0, cellLength);
+    });
+  });
+
+  // Apply the calculated column widths, with additional padding
+  const padding = 5;
+  columnWidths.forEach((width, index) => {
+    worksheet.getColumn(index + 1).width = width + padding;
+  });
+}
+
+async function generateExcelExperiment(experimentId, runIds, filePath) {
+  const workbook = new Excel.Workbook();
+
+  const experiment = await getExperiment(experimentId);
+  const study = await getStudy(experiment.study_id);
+  
+  // Create worksheet for individual runs
+  const runsSheet = workbook.addWorksheet('Individual Runs');
+
+  runsSheet.addRow(['Study:', study.title]);
+  runsSheet.addRow(['Experiment:', experiment.title]);
+  runsSheet.addRow([]);
+
+  let trial_count = 0;
+
+  let mouse_rows = {};
+  let mouse_day_means = {}
+  let day_row = ['', '', '']; // Blank cells corresponding to Mouse, Cage and Zigosizy
+  let trials_row = ['Mouse Id', "Cage Number", "Zigosity"];
+
+  for (const [dayIndex, run_id] of runIds.entries()) {
+    console.log("Day ", dayIndex + 1);
+    console.log("Id : ", run_id);
+    const run = await getRun(run_id);
+    console.log("Run ", run);
+    const runDate = new Date(run.date_acclim);
+
+    const dd = String(runDate.getDate()).padStart(2, '0');
+    const mm = String(runDate.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+    const yyyy = runDate.getFullYear();
+
+    const dateFormatted = `${dd}/${mm}/${yyyy}`;
+
+    const hh = String(runDate.getHours()).padStart(2, '0');
+    const min = String(runDate.getMinutes()).padStart(2, '0');
+
+    const timeFormatted = `${hh}:${min}`;
+
+    const temp_str = isNumber(run.temperature) ? `${run.temperature}°C` : run.temperature;
+    const humidity_str = isNumber(run.humidity) ? `${run.humidity} %` : run.humidity;
+    const lux_str = isNumber(run.lux) ? `${run.lux} lx` : run.lux;
+    runsSheet.addRow([`DAY ${dayIndex + 1}_${dateFormatted}`, `temp : ${temp_str}`, `humidity : ${humidity_str}`, `luminosity : ${lux_str}`,  `other : ${run.other}`, `Experimentator : ${run.experimentator}`]);
+    runsSheet.addRow(['Acclimatation time', timeFormatted]);
+    const run_trials = await getTrialsFromRun(run.id);
+    console.log("Trials : ", run_trials);
+    trials_row.push.apply(trials_row, [...Array(run_trials.length).fill(undefined).map((_, i) => `T${trial_count + i + 1}_ACC (s)`), `Mean Day ${dayIndex + 1}`]);
+    runsSheet.addRow(['Mouse Id', 'N° cage', ...Array(run_trials.length).fill(undefined).map((_, i) => `T${trial_count + i + 1}_ACC (s)`), ...Array(run_trials.length).fill(undefined).map((_, i) => `T${trial_count + i + 1}_RPM`)]);
+    day_row.push.apply(day_row, [`D${dayIndex + 1}`, ...Array(run_trials.length).fill('')]);
+    trial_count += run_trials.length;
+    
+    const runOrdering = await getOrderingFromRun(run.id);
+    for (const order of runOrdering) {
+      const cage = await getCage(order.cage_id);
+      const mice = await getMiceFromCage(cage.id);
+      
+      for (let mouse of mice) {
+        const mouse_trials = await getTrialsFromRunForMouse(run.id, mouse.id);
+        const time_rec_mouse = run_trials.map(trial => mouse_trials[trial.id] && mouse_trials[trial.id].time_record ? mouse_trials[trial.id].time_record : "");
+        let trial_values : TrialRecord[] = Object.values(mouse_trials);
+        trial_values = trial_values.filter(trial => trial.time_record != null);
+        console.log("Values", trial_values);
+        const mean_time = trial_values.length ? average(trial_values.map(trial => trial.time_record)) : "";
+        runsSheet.addRow([
+          mouse.ucb_identifier,
+          cage.cage_nb,
+          ...time_rec_mouse,
+          ...run_trials.map(trial => mouse_trials[trial.id] ? mouse_trials[trial.id].rpm_record : "")
+        ]);
+        if (!mouse_rows[mouse.id]) {
+          mouse_rows[mouse.id] = [mouse.ucb_identifier,  cage.cage_nb, mouse.zigosity];
+        }
+        if (!mouse_day_means[mouse.id]) {
+          mouse_day_means[mouse.id] = []
+        }
+        if (trial_values.length) {
+          mouse_day_means[mouse.id].push(mean_time);
+        }
+        console.log(time_rec_mouse);
+        mouse_rows[mouse.id].push.apply(mouse_rows[mouse.id], [...time_rec_mouse, mean_time]);
+      }
+    }
+    runsSheet.addRow([]);
+  }
+
+  console.log(mouse_rows);
+
+  // Create worksheet for aggregate information
+  const aggregateSheet = workbook.addWorksheet('Aggregate Information');
+  aggregateSheet.addRow(["Study :", study.title]);
+  aggregateSheet.addRow(["Experiment :", experiment.title]);
+  if (runIds.length) {
+    aggregateSheet.addRow([]);
+    day_row.push("Total");
+    aggregateSheet.addRow(day_row);
+    trials_row.push("Mean / Day");
+    aggregateSheet.addRow(trials_row);
+    
+    const cages = await getAllCagesFromExp(experimentId);
+    for (const cage of cages) {
+      const mice = await getMiceFromCage(cage.id);
+      for (const mouse of mice) {
+        mouse_rows[mouse.id].push(mouse_day_means[mouse.id].length ? average(mouse_day_means[mouse.id]) : "");
+        aggregateSheet.addRow(mouse_rows[mouse.id]);
+      }
+    }
+  }
+
+  // Format worksheets
+  formatWorksheet(runsSheet);
+  formatWorksheet(aggregateSheet);
+
+  // Save to file
+  await workbook.xlsx.writeFile(filePath);
+  console.log('Excel file generated successfully!');
+}
+
+
+
+app.post('/experiment/:exp_id/export_runs_to_excel', async (req, res) => {
+  const { exp_id } = req.params;
+  const { runIds } = req.body;
+
+  try {
+    // Validate the input
+    if (!Array.isArray(runIds) || runIds.length === 0) {
+      res.status(400).send("No valid run IDs provided");
+      return;
+    }
+
+    // Retrieve the runs data using the provided runIds
+    // Here, you will likely call functions to interact with your database, like your existing getTrialsFromRun, getRecordsFromTrial, getCageOrder, etc.
+
+    // Generate Excel file from the data
+    const filePath = await getExcelFilePath(exp_id); // Implement this function based on your requirements
+
+    await generateExcelExperiment(exp_id, runIds, filePath);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      res.status(500).send("An error occurred while generating the Excel file");
+      return;
+    }
+
+    // Send the file as response
+    res.setHeader('Content-Disposition', `attachment; filename=${path.basename(filePath)}`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    fs.createReadStream(filePath).pipe(res);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("An error occurred while exporting runs to Excel");
+  }
+});
 
 app.listen(port, function () {
   console.log('App is listening on port ' + port);

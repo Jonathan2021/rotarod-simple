@@ -1,1 +1,5 @@
-Cascade when deleting run, experiment etc.
+Ability to select runs when extracting to Excel
+trial_time show whole date_time on prompt. Store as Date in db.
+trial_nb increment between runs. Check that it is an int.
+Title in header.
+Move utility fns from server to another file.
