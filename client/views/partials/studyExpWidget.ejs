@@ -4,6 +4,7 @@
         <input type="button" value="Add new" id="addBtnStudy" class="widget-button" />
         <input type="button" value="Update Study" id="updateBtnStudy" class="widget-button"/>
         <input type="button" value="Delete" id="deleteBtnStudy" class="widget-button"/>
+        <input type="button" value="Export to Excel" id="exportToExcelStudyBtn" class="widget-button"/>
         <div id="jqxListBoxStudy" , class="list-container"></div>
     </div>
     <div id="expDiv">
@@ -11,7 +12,7 @@
         <input type="button" value="Add Experiment" id="addExpBtn" class="widget-button" />
         <input type="button" value="Update Experiment" id="updateExpBtn" class="widget-button"/>
         <input type="button" value="Delete Experiment" id="deleteExpBtn" class="widget-button"/>
-        <input type="button" value="Export to Excel" id="exportToExcelBtn" class="widget-button"/>
+        <input type="button" value="Export to Excel" id="exportToExcelExpBtn" class="widget-button"/>
         <div id="jqxListBoxExp" , class="list-container"></div>
     </div>
     <div id="runDiv">
@@ -25,6 +26,9 @@
 
 <div id="runsDialog" title="Select Runs to Export">
     <div id="jqxListBoxRunDialog"></div>
+</div>
+<div id="expsDialog" title="Select Experiments to Export">
+    <div id="jqxListBoxExpDialog"></div>
 </div>
 
 <script>
@@ -80,6 +84,7 @@ let refreshExp = function (study_id) {
             success: function (data) {
                 sourceExp.localdata = data;
                 $("#jqxListBoxExp").jqxListBox('refresh');
+                $("#jqxListBoxExpDialog").jqxListBox('refresh');
                 expChangeEvent(study_id);
                 resolve();
             },
@@ -149,9 +154,17 @@ $(document).ready(function () {
         width: '200px',
         height: '200px'
     });
+    
+    $("#jqxListBoxExpDialog").jqxListBox({
+        source: dataAdapterExp,
+        displayMember: 'title',
+        valueMember: 'id',
+        checkboxes: true,
+        width: '200px',
+        height: '200px'
+    });
 
 
-    // Create the runs dialog
     // Create the runs dialog
     $("#runsDialog").dialog({
         width: 250,
@@ -180,29 +193,61 @@ $(document).ready(function () {
         }
     });
 
-    $("#exportToExcelBtn").on('click', function () {
+    // Create the exp dialog
+    $("#expsDialog").dialog({
+        width: 250,
+        height: 250,
+        resizable: false,
+        modal: true,
+        autoOpen: false,
+        title: "Select Experiments to Export",
+        open: function() {
+            $("#jqxListBoxExpDialog").jqxListBox('checkAll'); // Check all runs when dialog opens
+        },
+        buttons: {
+            "Export": function() {
+                // Retrieve the selected run IDs
+                const selectedExps = $("#jqxListBoxExpDialog").jqxListBox('getCheckedItems').map(item => item.value);
+
+                // Trigger the Excel export for the selected runs
+                exportExpsToExcel(selectedExps);
+
+                // Close the dialog
+                $(this).dialog('close');
+            },
+            "Cancel": function() {
+                $(this).dialog('close');
+            }
+        }
+    });
+
+    $("#exportToExcelExpBtn").on('click', function () {
         // Open the runs dialog
         $("#runsDialog").dialog('open');
     });
 
+    $("#exportToExcelStudyBtn").on('click', function () {
+        // Open the runs dialog
+        $("#expsDialog").dialog('open');
+    });
+
     // Function to handle the Excel export
-    function exportRunsToExcel(runIds) {
-        const exp_id = $('#jqxListBoxExp').jqxListBox('getSelectedItem').value;
-        fetch("/experiment/" + exp_id + "/export_runs_to_excel", {
+    function exportToExcel(url, body, default_filename, ) {
+        fetch(url, {
             method: "POST",
-            body: JSON.stringify({ runIds }),
+            body: body,
             headers: {
                 "Content-Type": "application/json"
             }
         })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error("An error occurred while exporting runs to Excel");
+                    throw new Error("An error occurred while exporting to Excel");
                 }
 
                 // Extract filename from the response headers if available
                 const contentDisposition = response.headers.get("Content-Disposition");
-                const filename = contentDisposition ? contentDisposition.split('filename=')[1] : 'runs.xlsx';
+                const filename = contentDisposition ? contentDisposition.split('filename=')[1] : default_filename;
 
                 return response.blob().then(blob => {
                     // Create a link element to download the Blob
@@ -219,7 +264,21 @@ $(document).ready(function () {
             });
     }
 
-    $("#exportToExcelBtn").on('click', function () {
+    function exportRunsToExcel(runIds) {
+        const exp_id = $('#jqxListBoxExp').jqxListBox('getSelectedItem').value;
+        const url = "/experiment/" + exp_id + "/export_runs_to_excel";
+        const body = JSON.stringify({ runIds });
+        exportToExcel(url, body, "runs.xlsx")
+    }
+
+    function exportExpsToExcel(expIds) {
+        const study_id = $('#jqxListBoxStudy').jqxListBox('getSelectedItem').value;
+        const url = "/study/" + study_id + "/export_runs_to_excel";
+        const body = JSON.stringify({ expIds });
+        exportToExcel(url, body, "exps.xlsx")
+    }
+
+    $("#exportToExcelExpBtn").on('click', function () {
         // Open the runs dialog
         $("#runsDialog").jqxWindow('open');
     });
@@ -269,19 +328,19 @@ $(document).ready(function () {
 
 
     let enableButtonsStudy = function() {
-        $('#updateBtnStudy, #deleteBtnStudy').removeAttr('disabled');
+        $('#updateBtnStudy, #deleteBtnStudy, #exportToExcelStudyBtn').removeAttr('disabled');
     }
     
     let disableButtonsStudy = function() {
-        $('#updateBtnStudy, #deleteBtnStudy').attr('disabled', 'disabled');
+        $('#updateBtnStudy, #deleteBtnStudy, #exportToExcelStudyBtn').attr('disabled', 'disabled');
     }
 
     let enableButtonsExp = function() {
-        $('#updateExpBtn, #deleteExpBtn, #exportToExcelBtn').removeAttr('disabled');
+        $('#updateExpBtn, #deleteExpBtn, #exportToExcelExpBtn').removeAttr('disabled');
     }
     
     let disableButtonsExp = function() {
-        $('#updateExpBtn, #deleteExpBtn, #exportToExcelBtn').attr('disabled', 'disabled');
+        $('#updateExpBtn, #deleteExpBtn, #exportToExcelExpBtn').attr('disabled', 'disabled');
     }
 
     let enableButtonsRun = function() {

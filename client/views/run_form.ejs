@@ -303,7 +303,7 @@
 
         // jqxGrid Part
         function createGrid() {
-            var columns = [{ text: 'Mice', datafield: 'mouse', width:"15%"}];
+            var columns = [{ text: 'Mice', datafield: 'mouse', width:"15%", editable: false}];
 
             const sortedTrials = trials.slice().sort((a, b) => {
                 const timeA = a.trial_time.split(":");

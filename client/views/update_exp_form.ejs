@@ -42,7 +42,10 @@
       let nruns = <%- parseInt(nruns) %>;
 
       if (nruns) {
-        $("#cageDiv").hide();
+        $("#addRowBtn").prop('disabled', true);
+        $("#deleteRowsBtn").prop('disabled', true);
+        $("#pasteInfoBtn").prop('disabled', true);
+        $("#cageDiv").show();
       } else {
         $("#cageWarning").hide();
       }
@@ -63,17 +66,17 @@
       $("#cageGrid").jqxGrid({
         width: '100%',
         source: dataAdapter,
-        editable: true,
-        selectionmode: 'checkbox',
+        editable: !nruns,
+        selectionmode: nruns > 0 ? 'none' : 'checkbox',
         columns: [
-          { text: 'Cage number', datafield: 'cage_nb', 
+          { text: 'Cage number', datafield: 'cage_nb', editable: !nruns,
             validation: function (cell, value) {
               if (isNaN(value)) {
                   return { result: false, message: "Must be a number" };
               }
               return true;
           }},
-          { text: 'UCB identifier', datafield: 'ucb_identifier',
+          { text: 'UCB identifier', datafield: 'ucb_identifier', editable: !nruns,
             validation: function (cell, value) {
               if (isNaN(value)) {
                   return { result: false, message: "Must be a number" };

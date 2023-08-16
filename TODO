@@ -1,4 +1,4 @@
-Ability to select runs when extracting to Excel
+Ability to select cages used in a run ?
 trial_time show whole date_time on prompt. Store as Date in db.
 trial_nb increment between runs. Check that it is an int.
 Title in header.

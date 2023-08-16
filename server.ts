@@ -470,17 +470,20 @@ const processRunTrials = async (run_id, trials, trial_records) => {
       const record = trial_records[trialId][mouseId];
       const key = `${trialId}_${mouseId}`;
       console.log(key);
-      if (record.exists) {
-        if (!existingTrialRecordsMap[key]) {
-          throw new NotFoundError(`No existing trial record found for trial_id ${trialId} and mouse_id ${mouseId}`);
+      const timeRecord = record.time_record || null;
+      const rpmRecord = record.rpm_record || null;
+      if (timeRecord)
+      {
+        if (record.exists) {
+          if (!existingTrialRecordsMap[key]) {
+            throw new NotFoundError(`No existing trial record found for trial_id ${trialId} and mouse_id ${mouseId}`);
+          }
+          await updateTrialRecord(trialId, mouseId, timeRecord, rpmRecord);
+        } else {
+          await createTrialRecord(trialId, mouseId, timeRecord, rpmRecord);
         }
-        const timeRecord = record.time_record || null;
-        const rpmRecord = record.rpm_record || null;
-        await updateTrialRecord(trialId, mouseId, timeRecord, rpmRecord);
       } else {
-        const timeRecord = record.time_record || null;
-        const rpmRecord = record.rpm_record || null;
-        await createTrialRecord(trialId, mouseId, timeRecord, rpmRecord);
+        delete trial_records[trialId][mouseId]; // No time record -> remove the value from db if it is there.
       }
     }
   }
@@ -587,13 +590,12 @@ app.delete('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) =
 
 // Excel logic
 
-async function getExcelFilePath(exp_id) {
+async function getExcelFilePath(title) {
   const tempDir = os.tmpdir();
-  const exp = await getExperiment(exp_id);
-  const fileName = `export_run_${exp.title.replace(/ /g,"_")}_${Date.now()}.xlsx`;
+  const fileName = `export_${title.replace(/ /g,"_")}_${Date.now()}.xlsx`;
 
-  //return path.join('C:/Users/e637792/rotarod-simple/excel/', fileName);
-  return path.join(tempDir, fileName);
+  return path.join('C:/Users/e637792/rotarod-simple/excel/', fileName);
+  //return path.join(tempDir, fileName);
 }
 
 function isNumber(value) {
@@ -630,14 +632,36 @@ function formatWorksheet(worksheet) {
   });
 }
 
-async function generateExcelExperiment(experimentId, runIds, filePath) {
+async function generateExcelStudy(studyId, experimentIds, filePath) {
   const workbook = new Excel.Workbook();
 
+  const study = await getStudy(studyId);
+
+  for (const expId of experimentIds) {
+    const runs = await getRunsFromExperiment(expId);
+    await fillExcelExperiment(expId, runs.map(run => run.id), workbook);
+  }
+  
+  await workbook.xlsx.writeFile(filePath);
+  console.log('Excel file generated successfully!');
+}
+
+async function generateExcelExperiment(experimentId, runIds, filePath) {
+  const workbook = new Excel.Workbook();
+  
+  await fillExcelExperiment(experimentId, runIds, workbook)
+
+  // Save to file
+  await workbook.xlsx.writeFile(filePath);
+  console.log('Excel file generated successfully!');
+}
+
+async function fillExcelExperiment(experimentId, runIds, workbook) {
   const experiment = await getExperiment(experimentId);
   const study = await getStudy(experiment.study_id);
   
   // Create worksheet for individual runs
-  const runsSheet = workbook.addWorksheet('Individual Runs');
+  const runsSheet = workbook.addWorksheet(experiment.title + ' Individual Runs ');
 
   runsSheet.addRow(['Study:', study.title]);
   runsSheet.addRow(['Experiment:', experiment.title]);
@@ -676,6 +700,8 @@ async function generateExcelExperiment(experimentId, runIds, filePath) {
     const run_trials = await getTrialsFromRun(run.id);
     console.log("Trials : ", run_trials);
     trials_row.push.apply(trials_row, [...Array(run_trials.length).fill(undefined).map((_, i) => `T${trial_count + i + 1}_ACC (s)`), `Mean Day ${dayIndex + 1}`]);
+    runsSheet.addRow([]);
+    runsSheet.addRow(['Time', '', ...run_trials.map(trial => trial.trial_time)]);
     runsSheet.addRow(['Mouse Id', 'N° cage', ...Array(run_trials.length).fill(undefined).map((_, i) => `T${trial_count + i + 1}_ACC (s)`), ...Array(run_trials.length).fill(undefined).map((_, i) => `T${trial_count + i + 1}_RPM`)]);
     day_row.push.apply(day_row, [`D${dayIndex + 1}`, ...Array(run_trials.length).fill('')]);
     trial_count += run_trials.length;
@@ -717,7 +743,7 @@ async function generateExcelExperiment(experimentId, runIds, filePath) {
   console.log(mouse_rows);
 
   // Create worksheet for aggregate information
-  const aggregateSheet = workbook.addWorksheet('Aggregate Information');
+  const aggregateSheet = workbook.addWorksheet(experiment.title + ' Aggregate Information');
   aggregateSheet.addRow(["Study :", study.title]);
   aggregateSheet.addRow(["Experiment :", experiment.title]);
   if (runIds.length) {
@@ -740,10 +766,6 @@ async function generateExcelExperiment(experimentId, runIds, filePath) {
   // Format worksheets
   formatWorksheet(runsSheet);
   formatWorksheet(aggregateSheet);
-
-  // Save to file
-  await workbook.xlsx.writeFile(filePath);
-  console.log('Excel file generated successfully!');
 }
 
 
@@ -753,6 +775,11 @@ app.post('/experiment/:exp_id/export_runs_to_excel', async (req, res) => {
   const { runIds } = req.body;
 
   try {
+    const exp = await getExperiment(exp_id);
+    if (!exp) {
+      res.status(404).send("Couldn't find an experiment with id " + exp_id);
+      return;
+    }
     // Validate the input
     if (!Array.isArray(runIds) || runIds.length === 0) {
       res.status(400).send("No valid run IDs provided");
@@ -763,7 +790,7 @@ app.post('/experiment/:exp_id/export_runs_to_excel', async (req, res) => {
     // Here, you will likely call functions to interact with your database, like your existing getTrialsFromRun, getRecordsFromTrial, getCageOrder, etc.
 
     // Generate Excel file from the data
-    const filePath = await getExcelFilePath(exp_id); // Implement this function based on your requirements
+    const filePath = await getExcelFilePath(exp.title); // Implement this function based on your requirements
 
     await generateExcelExperiment(exp_id, runIds, filePath);
 
@@ -781,6 +808,49 @@ app.post('/experiment/:exp_id/export_runs_to_excel', async (req, res) => {
   } catch (err) {
     console.log(err);
     res.status(500).send("An error occurred while exporting runs to Excel");
+  }
+});
+
+app.post('/study/:study_id/export_runs_to_excel', async (req, res) => {
+  const { study_id } = req.params;
+  let { expIds } = req.body;
+
+  try {
+    const study = await getStudy(study_id);
+    if (!study)
+    {
+      res.status(404).send("Couldn't find study with id " + study_id);
+    }
+    // Validate the input
+    if (!Array.isArray(expIds) || expIds.length === 0) {
+      res.status(400).send("No valid run IDs provided");
+      return;
+    }
+
+    // Retrieve the runs data using the provided runIds
+    // Here, you will likely call functions to interact with your database, like your existing getTrialsFromRun, getRecordsFromTrial, getCageOrder, etc.
+
+    // Generate Excel file from the data
+    const filePath = await getExcelFilePath(study.title); // Implement this function based on your requirements
+    
+    expIds.sort().reverse();
+
+    await generateExcelStudy(study_id, expIds, filePath);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      res.status(500).send("An error occurred while generating the Excel file");
+      return;
+    }
+
+    // Send the file as response
+    res.setHeader('Content-Disposition', `attachment; filename=${path.basename(filePath)}`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    fs.createReadStream(filePath).pipe(res);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("An error occurred while exporting experiments to Excel");
   }
 });
 
