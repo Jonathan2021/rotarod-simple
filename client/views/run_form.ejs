@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <%- include('partials/header.ejs') %>
 <body>
+<%- include('partials/connection_warning.ejs') %>
     <div class="sticky-button">
-    <a href="/main">
-        <button>Back to Main Page</button>
-    </a>
+        <button id="menuButton">Back to Main Page</button>
     </div>
 
     <div class="form-container">
@@ -22,6 +21,9 @@
 
         <label for="experimentator">Experimentator:</label>
         <input type="text" id="experimentator" name="experimentator" value="<%= run ? run.experimentator : '' %>">
+        
+        <label for="place">Room:</label>
+        <input type="text" id="place" name="place" value="<%= run ? run.place : '' %>">
 
         <label for="date_acclim">Date and acclimatation time:</label>
         <%
@@ -39,7 +41,7 @@
         <label for="humidity">Humidity:</label>
         <input type="text" id="humidity" name="humidity" value="<%= run ? run.humidity : '' %>">
 
-        <label for="lux">Lux:</label>
+        <label for="lux">Lux (100-150):</label>
         <input type="text" id="lux" name="lux" value="<%= run ? run.lux : '' %>">
 
         <label for="other">Other:</label>
@@ -47,6 +49,10 @@
         <!-- <input type="text" id="other" name="other" value="<%= run ? run.other : '' %>"> -->
 
         <h3 id="orderInfo"></h3>
+        <button class="form-button" type="submit">Save Run</button>
+    </form>
+    </div>
+    <div id="allTrialStuff" <% if (!run) { %>hidden<% } %>>
         <div>
         <button id="startTrial">Start new Trial</button>
         </div>
@@ -57,7 +63,7 @@
         </div>
 
         <div id="trialDialog">
-            <h3 id="cageTitle">Cage 4</h3>
+            <h3 id="cageTitle"></h3>
             <div id="miceRecords"></div>
             <button id="previousButton" disabled>previous</button>
             <button id="nextButton">next</button>
@@ -70,17 +76,65 @@
         <p>Trial Number:</p>
         <input type="text" id="trialNbInput">
         </div>
-        <button class="form-button" type="submit">Save Run</button>
-    </form>
+        <div style="margin-top: 20px;">
+        <button id="markButton">Mark</button>
+        <button id="unmarkButton">Unmark</button>
+        <div id="jqxGridTrials" class="grid-container"></div>
+        </div>
     </div>
-    <div id="jqxGridTrials" class="grid-container"></div>
     <script>
         let trials;
         let trial_records;
         let cageMice;
         let cage_order;
         $(document).ready(function() {
+        
+            let defaultError = function (jqXHR) {
+                    let errorMessage = jqXHR.responseText;
+                    alert(errorMessage);
+        }
+        
+        let defaultSuccess = function(data) {};
 
+        function saveRun(onsuccess=defaultSuccess, onerror=defaultError) {
+            let run = <%- JSON.stringify(run) %>;
+            let type = 'POST'
+            let url="/study/<%= study_id %>/experiment/<%= exp_id %>/run";
+            if (run) {
+                type = "PUT";
+                url += "/" + run.id;
+            }
+
+            let is_constant = ($('#is_constant_rpm').is(":checked")) ? 1 : 0;
+            let jsonObject = {
+                
+                place: $('#place').val(),
+                is_constant_rpm: is_constant,
+                rpm: $('#rpm').val(),
+                experimentator: $('#experimentator').val(),
+                date_acclim: $('#date_acclim').val(),
+                temperature: $('#temperature').val(),
+                humidity: $('#humidity').val(),
+                lux: $('#lux').val(),
+                other: $('#other').val(),
+                trials: JSON.stringify(trials),
+                trial_records: JSON.stringify(trial_records)
+            };
+            
+            if (!run)
+                jsonObject['cage_order'] = JSON.stringify(cage_order);
+            console.log(jsonObject);
+
+            $.ajax({
+                url: url,
+                type: type,
+                data: jsonObject,
+                success: onsuccess,
+                error: onerror
+                });
+        }
+
+        $("#trialDialogInput").hide();
         $("#trialDialogInput").hide();
 
         let exp_id = <%- exp_id %>;
@@ -261,6 +315,7 @@
             mice.forEach(function(mouse) {
                 secondsValue = "";
                 rpmValue = $('#is_constant_rpm').is(":checked") ? $('#rpm').val() : "";
+                event = 0;
                 mouse_id = mouse.id;
                 mouse_nb = mouse.number;
                 if (trial_id in trial_records && mouse_id in trial_records[trial_id])
@@ -268,8 +323,10 @@
                     let existingRecord = trial_records[trial_id][mouse_id];
                     secondsValue = existingRecord.time_record;
                     rpmValue =  existingRecord.rpm_record;
+                    event = existingRecord.event;
                 }
-                let mouseHtml = '<div>- mouse <strong>' + mouse_nb + '</strong> seconds: <input type="text" class="secondsField" data-mouseid="' + mouse_id + '" value="' + secondsValue + '"> rpm: <input type="text" class="rpmField" data-mouseid="' + mouse_id + '" value="' + rpmValue + '"></div>';
+                let checkedAttribute = (event === 1) ? 'checked' : '';
+                let mouseHtml = '<div>- mouse <strong>' + mouse_nb + '</strong> seconds: <input type="text" class="secondsField" data-mouseid="' + mouse_id + '" value="' + secondsValue + '"> rpm: <input type="text" class="rpmField" data-mouseid="' + mouse_id + '" value="' + rpmValue + '"> <input type="checkbox" class="markCheckbox" data-mouseid="' + mouse_id + '" ' + checkedAttribute + '></div>';
                 $("#miceRecords").append(mouseHtml);
             });
 
@@ -290,6 +347,10 @@
                 mouse_id = mouse.id;
                 let seconds = $(".secondsField[data-mouseid='" + mouse_id + "']").val();
                 let rpm = $(".rpmField[data-mouseid='" + mouse_id + "']").val();
+                let event = $(".markCheckbox[data-mouseid='" + mouse_id + "']").is(":checked") ? 1 : 0;
+                console.log("Time ", seconds);
+                console.log("Checkbox ", $(".markCheckbox[data-mouseid='" + mouse_id + "']"));
+                console.log("Event ", event);
                 if (rpm !== "" || seconds !== "") {
                     if (!(mouse_id in trial_records[trial_id])) {
                         trial_records[trial_id][mouse_id] = {exists: false};
@@ -297,8 +358,10 @@
                     console.log(`${mouse.number} ${seconds} seconds / ${rpm} rpms`);
                     trial_records[trial_id][mouse_id]["time_record"] = seconds;
                     trial_records[trial_id][mouse_id]["rpm_record"] = rpm;
+                    trial_records[trial_id][mouse_id]["event"] = event;
                 }
             });
+            saveRun();
         }
 
         // jqxGrid Part
@@ -311,10 +374,30 @@
                 return timeA[0] * 60 + +timeA[1] - (timeB[0] * 60 + +timeB[1]);
             });
 
+            function getCellClass(row, column, value) {
+                var rowData = $("#jqxGridTrials").jqxGrid('getrowdata', row);
+                var mouse_id = rowData.mouse_id;
+                var trial_id = column.split('_')[1]; // Assuming the dataField is in the form 'trial_TRIALID_something'
+
+                if (trial_records[trial_id] && trial_records[trial_id][mouse_id] && trial_records[trial_id][mouse_id]["event"] === 1) {
+                    return 'highlight-yellow';
+                }
+
+                return ''; // return an empty string if no class is to be applied
+            }
+
             // Add columns for each trial
             sortedTrials.forEach(function(trial) {
-            columns.push({ text: "Trial " + trial.trial_nb + ' (' + trial.trial_time + ') - TIME', datafield: 'trial_' + trial.id + '_time' , cellsclassname: 'wrap-text', editable: true});
-            columns.push({ text: 'RPM', datafield: 'trial_' + trial.id + '_rpm', cellsclassname: 'wrap-text', editable: true});
+            columns.push(
+                { text: "Trial " + trial.trial_nb + ' (' + trial.trial_time + ') - TIME',
+                datafield: 'trial_' + trial.id + '_time' ,
+                cellclassname: getCellClass,
+                editable: true});
+            columns.push(
+                { text: 'RPM',
+                datafield: 'trial_' + trial.id + '_rpm',
+                cellslassname: getCellClass,
+                editable: true});
             });
 
             var data = [];
@@ -362,8 +445,10 @@
             source: dataAdapter,
             columns: columns,
             columnsresize: true,
-            editable:true
+            editable:true,
+            selectionmode: "singlecell"
             });
+            
 
             $("#jqxGridTrials").on('cellendedit', function(event) {
                 // event arguments
@@ -397,11 +482,53 @@
                 } else if (dataField.endsWith('_rpm')) {
                     trial_records[trial_id][mouse_id]["rpm_record"] = value;
                 }
+                saveRun();
             });
         }
 
-        createGrid();
+        let selectedRowIndex;
+        let selectedDataField;
         
+        function getRecord(selectedRowIndex, selectedDataField) {
+            const rowData = $("#jqxGridTrials").jqxGrid('getrowdata', selectedRowIndex);
+            const mouse_id = rowData.mouse_id;
+            const trial_id = selectedDataField.split('_')[1];
+            
+            if (!trial_records[trial_id][mouse_id]) {
+                trial_records[trial_id][mouse_id] = {};
+            }
+
+            return trial_records[trial_id][mouse_id];
+        }
+
+        $("#jqxGridTrials").on('cellselect', function(event) {
+            selectedRowIndex = event.args.rowindex;
+            selectedDataField = event.args.datafield;
+        });
+
+        function markOrUnmarkCell(eventValue) {
+            if (selectedRowIndex !== undefined && selectedDataField) {
+                let record = getRecord(selectedRowIndex, selectedDataField);
+                console.log(record);
+                record["event"] = eventValue;
+                
+                saveRun();
+                
+                // Refresh the cell
+                $("#jqxGridTrials").jqxGrid('refreshdata');
+            }
+        }
+
+
+        $('#markButton').click(function() {
+            markOrUnmarkCell(1);
+        });
+
+        $('#unmarkButton').click(function() {
+            markOrUnmarkCell(0);
+        });
+
+        createGrid(); 
 
         function getCurrentTime() {
             let date = new Date();
@@ -409,51 +536,26 @@
             let minutes = date.getMinutes().toString().padStart(2, '0');
             return hours + ':' + minutes;
         }
+        
+
+
+        $('#menuButton').on('click', function() {
+            let success = function(data) {
+                window.location.href = "/main";
+            }
+            saveRun(success);
+        })
 
         $('#runForm').on('submit', function(e) {
             e.preventDefault(); // Prevent the default form submission
             console.log("Submitting form");
-            
-            let run = <%- JSON.stringify(run) %>;
-            let type = 'POST'
-            let url="/study/<%= study_id %>/experiment/<%= exp_id %>/run";
-            if (run) {
-                type = "PUT";
-                url += "/" + run.id;
-            }
-
-            let is_constant = ($('#is_constant_rpm').is(":checked")) ? 1 : 0;
-            let jsonObject = {
-                
-                is_constant_rpm: is_constant,
-                rpm: $('#rpm').val(),
-                experimentator: $('#experimentator').val(),
-                date_acclim: $('#date_acclim').val(),
-                temperature: $('#temperature').val(),
-                humidity: $('#humidity').val(),
-                lux: $('#lux').val(),
-                other: $('#other').val(),
-                trials: JSON.stringify(trials),
-                trial_records: JSON.stringify(trial_records)
-            };
-            
-            if (!run)
-                jsonObject['cage_order'] = JSON.stringify(cage_order);
-            console.log(jsonObject);
-
-            $.ajax({
-                url: url,
-                type: type,
-                data: jsonObject,
-                success: function(data) {
-                    if (data.redirect)
+            let success = function(data) {
+                    let isCreation = <%= run ? false : true %>
+                    if (data.redirect && isCreation)
                         window.location.href = data.redirect;
-                },
-                error: function (jqXHR) {
-                    let errorMessage = jqXHR.responseText;
-                    alert(errorMessage);
-                }
-                });
+                    }
+                
+            saveRun(success);
         });
 
     });

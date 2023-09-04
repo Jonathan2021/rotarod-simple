@@ -2,7 +2,18 @@ import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import path from 'path';
 
-export const dbPath = path.join(__dirname, 'database', 'myDatabase.db');
+//export const dbPath = path.join(__dirname, 'database', 'myDatabase.db');
+let dbPath: string;
+
+if (process.env.NODE_ENV === 'development') {
+  dbPath = path.join(__dirname, 'database', 'myDatabase.db');
+} else if (process.env.NODE_ENV === 'production') {
+  dbPath = '\\\\ncdata-prd-storage.dir.ucb-group.com\\ncd_data$\\Noldus_Ethovision\\Rotarod\\database.db';
+} else {
+  throw new Error('NODE_ENV not set');
+}
+
+export { dbPath };
 
 let dbInstance: Database | null = null;
 
@@ -69,15 +80,15 @@ export const getStudy = async (studyId) => {
   return await db.get(`SELECT * FROM "Study" WHERE id = ?`, studyId);
 };
 
-export const createStudy = async (title) => {
+export const createStudy = async (title, ethProj, tickat) => {
   const db = await getDatabase();
-  const result = await db.run(`INSERT INTO "Study" (title) VALUES (?)`, title);
+  const result = await db.run(`INSERT INTO "Study" (title, eth_proj, tickat) VALUES (?, ?, ?)`, title, ethProj, tickat);
   return result.lastID;
 };
 
-export const updateStudy = async (id, title) => {
+export const updateStudy = async (id, title, ethProj, tickat) => {
   const db = await getDatabase();
-  const result = await db.run(`UPDATE "Study" SET title = ? WHERE id = ?`, title, id);
+  const result = await db.run(`UPDATE "Study" SET title = ?, eth_proj = ?, tickat = ? WHERE id = ?`, title, ethProj, tickat, id);
 
   if (result.changes === 0) {
     throw new NotFoundError(`No study found with id ${id}`);
@@ -102,7 +113,7 @@ export const getExperiments = async () => {
 
 export const getExperimentsFromStudy = async (studyId) => {
   const db = await getDatabase();
-  return await db.all(`SELECT * FROM "Experiment" WHERE study_id = ? ORDER BY "id" DESC`, studyId);
+  return await db.all(`SELECT * FROM "Experiment" WHERE study_id = ? ORDER BY "creation_dt" DESC`, studyId);
 };
 
 export const getExperiment = async (experimentId) => {
@@ -112,7 +123,7 @@ export const getExperiment = async (experimentId) => {
 
 export const createExperiment = async (studyId, title) => {
   const db = await getDatabase();
-  const result = await db.run(`INSERT INTO "Experiment" (study_id, title) VALUES (?, ?)`, studyId, title);
+  const result = await db.run(`INSERT INTO "Experiment" (study_id, title, creation_dt) VALUES (?, ?, datetime('now'))`, studyId, title);
   return result.lastID;
 };
 
@@ -161,7 +172,7 @@ export const getCage = async (cageId) => {
 export const getCageCompleteFromExp = async (expId) => {
   const db = await getDatabase();
   return await db.all(`
-    SELECT Cage.id, Cage.cage_nb, Cage.exp_id, Mouse.id as mouse_id, Mouse.ucb_identifier, Mouse.zigosity
+    SELECT Cage.id, Cage.cage_nb, Cage.exp_id, Mouse.id as mouse_id, Mouse.ucb_identifier, Mouse.zigosity, Mouse.treatment
     FROM Cage 
     LEFT JOIN Mouse ON Cage.id = Mouse.cage_id
     WHERE Cage.exp_id = ? 
@@ -209,6 +220,15 @@ export const getMice = async () => {
   const db = await getDatabase();
   return await db.all(`SELECT * FROM "Mouse"`);
 };
+      
+export const getMiceOrderedExcel = async (expId) => {
+  const db = await getDatabase();
+  return await db.all(`
+  SELECT Mouse.* FROM Mouse
+  JOIN Cage ON Mouse.cage_id = Cage.id
+  WHERE Cage.exp_id = ?
+  ORDER BY Mouse.zigosity ASC, Mouse.treatment ASC, Mouse.id ASC;`, expId);
+};
 
 export const getMouse = async (mouseId) => {
   const db = await getDatabase();
@@ -231,23 +251,23 @@ export const getAllMiceFromExp = async (expId) => {
 };
 
 
-export const createMouse = async (cageId, ucbIdentifier, zigosity) => {
+export const createMouse = async (cageId, ucbIdentifier, zigosity, treatment) => {
   const db = await getDatabase();
   const result = await db.run(`
-    INSERT INTO "Mouse" (cage_id, ucb_identifier, zigosity)
-    VALUES (?, ?, ?)
-  `, cageId, ucbIdentifier, zigosity);
+    INSERT INTO "Mouse" (cage_id, ucb_identifier, zigosity, treatment)
+    VALUES (?, ?, ?, ?)
+  `, cageId, ucbIdentifier, zigosity, treatment);
 
   return result.lastID;
 };
 
-export const updateMouse = async (id, cageId, ucbIdentifier, zigosity) => {
+export const updateMouse = async (id, cageId, ucbIdentifier, zigosity, treatment) => {
   const db = await getDatabase();
   const result = await db.run(`
     UPDATE "Mouse"
-    SET cage_id = ?, ucb_identifier = ?, zigosity = ?
+    SET cage_id = ?, ucb_identifier = ?, zigosity = ?, treatment = ?
     WHERE id = ?
-  `, cageId, ucbIdentifier, zigosity, id);
+  `, cageId, ucbIdentifier, zigosity, treatment, id);
 
   if (result.changes === 0) {
     throw new NotFoundError(`No mouse found with id ${id}`);
@@ -283,23 +303,23 @@ export const getRun = async (runId) => {
   return await db.get(`SELECT * FROM "Run" WHERE id = ?`, runId);
 };
 
-export const createRun = async (experimentId, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other) => {
+export const createRun = async (experimentId, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other) => {
   const db = await getDatabase();
   const result = await db.run(`
-    INSERT INTO "Run" (experiment_id, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, experimentId, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
+    INSERT INTO "Run" (experiment_id, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, experimentId, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
 
   return result.lastID;
 };
 
-export const updateRun = async (id, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other) => {
+export const updateRun = async (id, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other) => {
   const db = await getDatabase();
   const result = await db.run(`
     UPDATE "Run"
-    SET is_constant_rpm = ?, rpm = ?, experimentator = ?, date_acclim = ?, temperature = ?, humidity = ?, lux = ?, other = ?
+    SET place = ?, is_constant_rpm = ?, rpm = ?, experimentator = ?, date_acclim = ?, temperature = ?, humidity = ?, lux = ?, other = ?
     WHERE id = ?
-  `, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other, id);
+  `, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other, id);
     
   if (result.changes === 0) {
     throw new NotFoundError(`No run found with id ${id}`);
@@ -319,7 +339,7 @@ export const getTrialsAndRecords = async (run_id) => {
   const db = await getDatabase();
 
   const result = await db.all(`
-    SELECT Trial.id AS trial_id, Trial.trial_nb, Trial.trial_time, Trial_record.time_record, Trial_record.rpm_record, Trial_record.mouse_id
+    SELECT Trial.id AS trial_id, Trial.trial_nb, Trial.trial_time, Trial_record.time_record, Trial_record.rpm_record, Trial_record.event, Trial_record.mouse_id
     FROM Trial
     LEFT JOIN Trial_record ON Trial.id = Trial_record.trial_id
     WHERE Trial.run_id = ?
@@ -338,6 +358,7 @@ export const getTrialsAndRecords = async (run_id) => {
     trials[record.trial_id].records.push({
       time_record: record.time_record,
       rpm_record: record.rpm_record,
+      event: record.event,
       mouse_id: record.mouse_id,
     });
 
@@ -457,7 +478,7 @@ export const getTrialsFromRun = async (runId) => {
 
 export const getTrialsFromRunForMouse = async (runId, mouseId) => {
   const db = await getDatabase();
-  const rows = await db.all(`SELECT tr.trial_id, tr.time_record, tr.rpm_record
+  const rows = await db.all(`SELECT tr.trial_id, tr.time_record, tr.rpm_record, tr.event
         FROM Trial_record AS tr
         JOIN Trial AS t ON tr.trial_id = t.id
         JOIN Run AS r ON t.run_id = r.id
@@ -467,7 +488,8 @@ export const getTrialsFromRunForMouse = async (runId, mouseId) => {
   rows.forEach(row => {
     result[row.trial_id] = {
       time_record: row.time_record,
-      rpm_record: row.rpm_record
+      rpm_record: row.rpm_record,
+      event: row.event
     };
   });
 
@@ -525,14 +547,14 @@ export const getTrialRecord = async (trialId, mouseId) => {
   return await db.get(`SELECT * FROM "Trial_record" WHERE trial_id = ? AND mouse_id = ?`, trialId, mouseId);
 };
 
-export const createTrialRecord = async (trialId, mouseId, timeRecord, rpmRecord) => {
+export const createTrialRecord = async (trialId, mouseId, timeRecord, rpmRecord, event) => {
   const db = await getDatabase();
-  await db.run(`INSERT INTO "Trial_record" (trial_id, mouse_id, time_record, rpm_record) VALUES (?, ?, ?, ?)`, trialId, mouseId, timeRecord, rpmRecord);
+  await db.run(`INSERT INTO "Trial_record" (trial_id, mouse_id, time_record, rpm_record, event) VALUES (?, ?, ?, ?, ?)`, trialId, mouseId, timeRecord, rpmRecord, event);
 };
 
-export const updateTrialRecord = async (trialId, mouseId, timeRecord, rpmRecord) => {
+export const updateTrialRecord = async (trialId, mouseId, timeRecord, rpmRecord, event) => {
   const db = await getDatabase();
-  await db.run(`UPDATE "Trial_record" SET time_record = ?, rpm_record = ? WHERE trial_id = ? AND mouse_id = ?`, timeRecord, rpmRecord, trialId, mouseId);
+  await db.run(`UPDATE "Trial_record" SET time_record = ?, rpm_record = ?, event = ? WHERE trial_id = ? AND mouse_id = ?`, timeRecord, rpmRecord, event, trialId, mouseId);
 };
 
 export const deleteTrialRecord = async (trialId, mouseId) => {

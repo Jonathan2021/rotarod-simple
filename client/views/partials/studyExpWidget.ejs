@@ -30,6 +30,14 @@
 <div id="expsDialog" title="Select Experiments to Export">
     <div id="jqxListBoxExpDialog"></div>
 </div>
+<div id="studyDialog" title="Enter Study Details">
+    <p>Title:</p>
+    <input type="text" id="studyTitleInput">
+    <p>Ethical Project:</p>
+    <input type="text" id="studyEthProjInput">
+    <p>Tick@lab batch</p>
+    <input type="text" id="studyTickatInput">
+</div>
 
 <script>
 
@@ -421,28 +429,44 @@ $(document).ready(function () {
     });
 
     $('#addBtnStudy').click(function () {
-        let title = prompt("Please enter the title for the new study:");
-        if (title != null && title != "") {
-            $.ajax({
-                url: "/study",
-                type: "POST",
-                data: { title },
-                success: function (data) {
-                    console.log(data);
-                    window.dispatchEvent(studyCreateEvent({ id : data.id }));
-                },
-                error: function(jqXHR)
-                {
-                    let json = JSON.parse(jqXHR.responseText);
-                    alert(json.error);
+        $("#studyTitleInput").val('');
+        $("#studyEthProjInput").val('');
+        $("#studyTickatInput").val('');
+
+        $("#studyDialog").dialog({
+            buttons: {
+                "Save Study": function() {
+                let title = $("#studyTitleInput").val().trim();
+                let eth_proj = $("#studyEthProjInput").val().trim();
+                let tickat = $("#studyTickatInput").val().trim();
+                if (title != null && title != "") {
+                    $.ajax({
+                        url: "/study",
+                        type: "POST",
+                        data: { title , eth_proj, tickat},
+                        success: function (data) {
+                            console.log(data);
+                            window.dispatchEvent(studyCreateEvent({ id : data.id }));
+                        },
+                        error: function(jqXHR)
+                        {
+                            let json = JSON.parse(jqXHR.responseText);
+                            alert(json.error);
+                        }
+                    });
+                    $(this).dialog("close");
                 }
-            });
-        }
-        else
-        {
-            if (title === "")
-                alert("The study title can't be empty");
-        }
+                else
+                {
+                    if (title === "")
+                        alert("The study title can't be empty");
+                }
+                },
+                "Cancel": function() {
+                    $(this).dialog("close");
+                }
+            },
+        });
     });
 
     $('#updateBtnStudy').click(function () {
@@ -450,27 +474,45 @@ $(document).ready(function () {
         if (!selectedStudy)
             alert("Please select a study to update");
         selectedStudy = selectedStudy.originalItem;
-        
-        let newTitle = prompt("Please enter a new title for the study:", selectedStudy.title);
 
-        if (newTitle != null && newTitle != "") {
-            $.ajax({ 
-                url: '/study/' + selectedStudy.id,
-                type: 'PUT',
-                data: { newTitle },
-                success: function (data) {
-                    window.dispatchEvent(studyUpdateEvent({ id: data.id }));
-                },
-                error: function (jqXHR) {
-                    let json = JSON.parse(jqXHR.responseText);
-                    alert(json.error);
+        $("#studyTitleInput").val(selectedStudy.title);
+        $("#studyEthProjInput").val(selectedStudy.eth_proj);
+        $("#studyTickatInput").val(selectedStudy.tickat);
+
+        $("#studyDialog").dialog({
+            buttons: {
+                "Save Study": function() {
+                let newTitle = $("#studyTitleInput").val().trim();
+                let newEthProj = $("#studyEthProjInput").val().trim();
+                let newTickat = $("#studyTickatInput").val().trim();
+                if (newTitle != null && newTitle != "") {
+                    $.ajax({
+                        url: "/study/" + selectedStudy.id,
+                        type: "PUT",
+                        data: { newTitle , newEthProj, newTickat},
+                        success: function (data) {
+                            console.log(data);
+                            window.dispatchEvent(studyUpdateEvent({ id : data.id }));
+                        },
+                        error: function(jqXHR)
+                        {
+                            let json = JSON.parse(jqXHR.responseText);
+                            alert(json.error);
+                        }
+                    });
+                    $(this).dialog("close");
                 }
-            });
-        }
-        else
-        {
-            alert("The study title can't be empty");
-        }
+                else
+                {
+                    if (newTitle === "")
+                        alert("The study title can't be empty");
+                }
+                },
+                "Cancel": function() {
+                    $(this).dialog("close");
+                }
+            },
+        });
     });
 
     $('#deleteBtnStudy').click(function () {

@@ -54,3 +54,7 @@
     box-sizing: border-box;
     height: 100%;
 }
+
+.highlight-yellow {
+    background-color: yellow !important;
+}

@@ -1,0 +1,41 @@
+<!-- connection-warning.ejs -->
+<div id="connection-warning" class="hidden">
+  You have lost internet connection.
+</div>
+
+<script>
+  $(document).ready(function() {
+    function updateOnlineStatus() {
+      const warning = $('#connection-warning');
+      if (navigator.onLine) {
+        warning.addClass('hidden');
+      } else {
+        warning.removeClass('hidden');
+      }
+    }
+
+    // Initial check
+    updateOnlineStatus();
+
+    // Listen for subsequent changes
+    $(window).on('online', updateOnlineStatus);
+    $(window).on('offline', updateOnlineStatus);
+  });
+</script>
+
+<style>
+  .hidden {
+    display: none;
+  }
+
+  #connection-warning {
+    background-color: #f44336; /* Red background */
+    color: white; /* White text color */
+    text-align: center; /* Center-aligned text */
+    position: fixed; /* Fixed position */
+    top: 0; /* Stick it to the top */
+    width: 100%; /* Full width */
+    z-index: 2000; /* On top */
+    padding: 10px; /* Some padding */
+  }
+</style>

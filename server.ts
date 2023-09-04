@@ -7,6 +7,9 @@ import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import Excel from 'exceljs';
 import os from "os";
+import http from 'http';
+
+import { closeDatabase } from './server/utils';
 
 import {
   isUniqueConstraintError, NotFoundError,
@@ -24,7 +27,7 @@ import {
   getMice,
   getCages,
   updateTrial, createTrial, updateTrialRecord, createTrialRecord, deleteTrial, deleteTrialRecord, getTrials, getTrialRecords, deleteAllTrials, deleteAllTrialRecords,
-  getTrialsFromRun, getRecordsFromTrial, getMouse, getRunOrdering, getOrderingFromRun, getCage, getMiceFromCage, getTrialsFromRunForMouse, getStudy
+  getTrialsFromRun, getRecordsFromTrial, getMouse, getRunOrdering, getOrderingFromRun, getCage, getMiceFromCage, getTrialsFromRunForMouse, getStudy, getMiceOrderedExcel
 } from './server/utils'
 
 declare module 'express-session' {
@@ -35,6 +38,7 @@ declare module 'express-session' {
 }
 
 const app: express.Application = express();
+const server = http.createServer(app);
 
 // Set EJS as the view engine
 app.set('view engine', 'ejs');
@@ -166,10 +170,10 @@ app.get('/experiment/:exp_id/cages', async(req, res) => {
 
 // Create a new study
 app.post('/study', async (req, res) => {
-  let { title } = req.body;
+  let { title, eth_proj, tickat } = req.body;
  
   try {
-    const id = await createStudy(title);
+    const id = await createStudy(title, eth_proj, tickat);
     res.json({ id });
   } catch (err) {
     console.log(err);
@@ -184,10 +188,10 @@ app.post('/study', async (req, res) => {
 // Update a study
 app.put('/study/:study_id', async (req, res) => {
   const { study_id } = req.params;
-  const { newTitle } = req.body;
+  const { newTitle, newEthProj, newTickat } = req.body;
   
   try {
-    await updateStudy(study_id, newTitle);
+    await updateStudy(study_id, newTitle, newEthProj, newTickat);
     res.json({ study_id });
   } catch (err) {
     console.log(err);
@@ -258,6 +262,7 @@ interface ICageInfo {
   cage_nb: number;
   ucb_identifier: number;
   zigosity: string;
+  treatment: string;
 }
 
 const updateExperimentCages = async (expId: number, cageInfo: ICageInfo[]) => {
@@ -270,14 +275,14 @@ const updateExperimentCages = async (expId: number, cageInfo: ICageInfo[]) => {
   {
     if (!grouped[info.cage_nb])
       grouped[info.cage_nb] = [];
-    grouped[info.cage_nb].push({ucb_identifier: info.ucb_identifier, zigosity: info.zigosity});
+    grouped[info.cage_nb].push({ucb_identifier: info.ucb_identifier, zigosity: info.zigosity, treatment: info.treatment});
   }
   console.log("GROUPED ", grouped);
   let cage_id;
   for (let cage of Object.keys(grouped)) {
     cage_id = await createCage(cage, expId);
     for (let info_mouse of grouped[cage]) {
-      await createMouse(cage_id, info_mouse.ucb_identifier, info_mouse.zigosity);
+      await createMouse(cage_id, info_mouse.ucb_identifier, info_mouse.zigosity, info_mouse.treatment);
     }
   }
 };
@@ -392,6 +397,7 @@ app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
               cur_records[record.mouse_id] = {
                 time_record: record.time_record ? record.time_record : "",
                 rpm_record: record.rpm_record ? record.rpm_record : "",
+                event: record.event ? record.event : 0,
                 exists: true
               };
             }
@@ -472,15 +478,16 @@ const processRunTrials = async (run_id, trials, trial_records) => {
       console.log(key);
       const timeRecord = record.time_record || null;
       const rpmRecord = record.rpm_record || null;
-      if (timeRecord)
+      const event = record.event;
+      if (timeRecord || event)
       {
         if (record.exists) {
           if (!existingTrialRecordsMap[key]) {
             throw new NotFoundError(`No existing trial record found for trial_id ${trialId} and mouse_id ${mouseId}`);
           }
-          await updateTrialRecord(trialId, mouseId, timeRecord, rpmRecord);
+          await updateTrialRecord(trialId, mouseId, timeRecord, rpmRecord, event);
         } else {
-          await createTrialRecord(trialId, mouseId, timeRecord, rpmRecord);
+          await createTrialRecord(trialId, mouseId, timeRecord, rpmRecord, event);
         }
       } else {
         delete trial_records[trialId][mouseId]; // No time record -> remove the value from db if it is there.
@@ -515,6 +522,7 @@ const processRunTrials = async (run_id, trials, trial_records) => {
 app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
   const { exp_id } = req.params;
   const {
+    place,
     is_constant_rpm,
     rpm,
     experimentator,
@@ -529,7 +537,7 @@ app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
    } = req.body;
   try {
     console.log(is_constant_rpm);
-    const id = await createRun(exp_id, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
+    const id = await createRun(exp_id, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
     console.log("In create");
     console.log(cage_order);
     await createCageOrder(id, JSON.parse(cage_order)); // Could move in separate try catch to delete run if problem occurs here
@@ -545,6 +553,7 @@ app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
 app.put('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
   const { run_id } = req.params;
   const {
+    place,
     is_constant_rpm,
     rpm,
     experimentator,
@@ -557,7 +566,7 @@ app.put('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
     trial_records
    } = req.body;
   try {
-    await updateRun(run_id, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
+    await updateRun(run_id, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
     await processRunTrials(run_id, JSON.parse(trials), JSON.parse(trial_records));
     res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${run_id}` });
   } catch (err) {
@@ -606,6 +615,7 @@ function isNumber(value) {
 interface TrialRecord {
   time_record: number;
   rpm_record: number;
+  event: boolean;
 }
 
 const average = array => array.reduce((a, b) => a + b) / array.length;
@@ -637,7 +647,7 @@ async function generateExcelStudy(studyId, experimentIds, filePath) {
 
   const study = await getStudy(studyId);
 
-  for (const expId of experimentIds) {
+  for (const expId of experimentIds.reverse()) {
     const runs = await getRunsFromExperiment(expId);
     await fillExcelExperiment(expId, runs.map(run => run.id), workbook);
   }
@@ -670,9 +680,11 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
   let trial_count = 0;
 
   let mouse_rows = {};
+  let mouse_rows_highlight = {}
   let mouse_day_means = {}
-  let day_row = ['', '', '']; // Blank cells corresponding to Mouse, Cage and Zigosizy
-  let trials_row = ['Mouse Id', "Cage Number", "Zigosity"];
+  let day_row = ['', '', '', '']; // Blank cells corresponding to Mouse, Cage, Group and Treatment
+  let trials_row = ['Mouse Id', "Cage Number", "Group", "Treatment"];
+  let trials_per_run = [];
 
   for (const [dayIndex, run_id] of runIds.entries()) {
     console.log("Day ", dayIndex + 1);
@@ -695,10 +707,11 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
     const temp_str = isNumber(run.temperature) ? `${run.temperature}°C` : run.temperature;
     const humidity_str = isNumber(run.humidity) ? `${run.humidity} %` : run.humidity;
     const lux_str = isNumber(run.lux) ? `${run.lux} lx` : run.lux;
-    runsSheet.addRow([`DAY ${dayIndex + 1}_${dateFormatted}`, `temp : ${temp_str}`, `humidity : ${humidity_str}`, `luminosity : ${lux_str}`,  `other : ${run.other}`, `Experimentator : ${run.experimentator}`]);
+    runsSheet.addRow([`DAY ${dayIndex + 1}_${dateFormatted}`, `place: ${run.place}`, `temp : ${temp_str}`, `humidity : ${humidity_str}`, `luminosity : ${lux_str}`,  `other : ${run.other}`, `Experimentator : ${run.experimentator}`]);
     runsSheet.addRow(['Acclimatation time', timeFormatted]);
     const run_trials = await getTrialsFromRun(run.id);
     console.log("Trials : ", run_trials);
+    trials_per_run.push(run_trials.length);
     trials_row.push.apply(trials_row, [...Array(run_trials.length).fill(undefined).map((_, i) => `T${trial_count + i + 1}_ACC (s)`), `Mean Day ${dayIndex + 1}`]);
     runsSheet.addRow([]);
     runsSheet.addRow(['Time', '', ...run_trials.map(trial => trial.trial_time)]);
@@ -714,18 +727,36 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
       for (let mouse of mice) {
         const mouse_trials = await getTrialsFromRunForMouse(run.id, mouse.id);
         const time_rec_mouse = run_trials.map(trial => mouse_trials[trial.id] && mouse_trials[trial.id].time_record ? mouse_trials[trial.id].time_record : "");
+        const event_mouse = run_trials.map(trial => mouse_trials[trial.id] && mouse_trials[trial.id].event);
         let trial_values : TrialRecord[] = Object.values(mouse_trials);
         trial_values = trial_values.filter(trial => trial.time_record != null);
         console.log("Values", trial_values);
         const mean_time = trial_values.length ? average(trial_values.map(trial => trial.time_record)) : "";
-        runsSheet.addRow([
+        let row = runsSheet.addRow([
           mouse.ucb_identifier,
           cage.cage_nb,
           ...time_rec_mouse,
           ...run_trials.map(trial => mouse_trials[trial.id] ? mouse_trials[trial.id].rpm_record : "")
         ]);
+
+        
+        event_mouse.forEach((event, index) => {
+          if (event) {
+            // Assuming the first 2 columns are "Mouse Id" and "N° cage"
+            // Adjust index based on your actual layout
+            const cell = row.getCell(index + 3); // 1 Indexed, that's why it's not 2
+            cell.fill = {
+              type: 'pattern',
+              pattern:'solid',
+              fgColor:{ argb:'FFFF00' }  // Yellow background
+            };
+          }
+        });
+
         if (!mouse_rows[mouse.id]) {
-          mouse_rows[mouse.id] = [mouse.ucb_identifier,  cage.cage_nb, mouse.zigosity];
+          mouse_rows[mouse.id] = [mouse.ucb_identifier,  cage.cage_nb, mouse.zigosity, mouse.treatment];
+          mouse_rows_highlight[mouse.id] = [false, false, false, false];
+
         }
         if (!mouse_day_means[mouse.id]) {
           mouse_day_means[mouse.id] = []
@@ -735,6 +766,7 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
         }
         console.log(time_rec_mouse);
         mouse_rows[mouse.id].push.apply(mouse_rows[mouse.id], [...time_rec_mouse, mean_time]);
+        mouse_rows_highlight[mouse.id].push.apply(mouse_rows_highlight[mouse.id], [...event_mouse, false]);
       }
     }
     runsSheet.addRow([]);
@@ -744,22 +776,50 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
 
   // Create worksheet for aggregate information
   const aggregateSheet = workbook.addWorksheet(experiment.title + ' Aggregate Information');
-  aggregateSheet.addRow(["Study :", study.title]);
+  aggregateSheet.addRow(["Study :", study.title, "Ethical Project :", study.eth_proj, "Tick@lab batch :", study.tickat]);
   aggregateSheet.addRow(["Experiment :", experiment.title]);
   if (runIds.length) {
     aggregateSheet.addRow([]);
     day_row.push("Total");
-    aggregateSheet.addRow(day_row);
+    let row = aggregateSheet.addRow(day_row);
+    row.eachCell((cell) => {
+      cell.font = { bold: true };
+    });
+
     trials_row.push("Mean / Day");
-    aggregateSheet.addRow(trials_row);
+    row = aggregateSheet.addRow(trials_row);
+
+    function boldRow(row) {
+      let incr = 4 + 1 // Id, Cage, Group, Treatment + 1 because 1 indexed
+      trials_per_run.forEach((nb_trials) => {
+        let cell = row.getCell(nb_trials + incr);
+        cell.font = { bold: true };
+        incr += nb_trials + 1;
+      });
+
+      let cell = row.getCell(incr);
+      cell.font = { bold: true };
+    }
+
+    boldRow(row);
     
-    const cages = await getAllCagesFromExp(experimentId);
-    for (const cage of cages) {
-      const mice = await getMiceFromCage(cage.id);
-      for (const mouse of mice) {
-        mouse_rows[mouse.id].push(mouse_day_means[mouse.id].length ? average(mouse_day_means[mouse.id]) : "");
-        aggregateSheet.addRow(mouse_rows[mouse.id]);
-      }
+    const mice = await getMiceOrderedExcel(experimentId);
+    for (const mouse of mice) {
+      mouse_rows[mouse.id].push(mouse_day_means[mouse.id].length ? average(mouse_day_means[mouse.id]) : "");
+      mouse_rows_highlight[mouse.id].push(false);
+      row = aggregateSheet.addRow(mouse_rows[mouse.id]);
+      
+      mouse_rows_highlight[mouse.id].forEach((event, index) => {
+        if (event) {
+          const cell = row.getCell(index + 1); // 1 Indexed.
+          cell.fill = {
+            type: 'pattern',
+            pattern:'solid',
+            fgColor:{ argb:'FFFF00' }  // Yellow background
+          };
+        }
+      });
+      boldRow(row);
     }
   }
 
@@ -833,7 +893,24 @@ app.post('/study/:study_id/export_runs_to_excel', async (req, res) => {
     // Generate Excel file from the data
     const filePath = await getExcelFilePath(study.title); // Implement this function based on your requirements
     
-    expIds.sort().reverse();
+    const sortExpIdsByCreationDt = async (expIds) => {
+      const experimentsWithDates = await Promise.all(expIds.map(async (id) => {
+        const experiment = await getExperiment(id);
+        return {
+          id,
+          creation_dt: experiment.creation_dt,
+        };
+      }));
+
+      const sortedExperiments = experimentsWithDates.sort((a, b) => {
+        // Assuming creation_dt is a datetime string that can be compared lexicographically
+        return a.creation_dt < b.creation_dt ? 1 : -1;
+      });
+
+      return sortedExperiments.map(exp => exp.id);
+    };
+
+    expIds = await sortExpIdsByCreationDt(expIds);
 
     await generateExcelStudy(study_id, expIds, filePath);
 
@@ -854,9 +931,38 @@ app.post('/study/:study_id/export_runs_to_excel', async (req, res) => {
   }
 });
 
-app.listen(port, function () {
-  console.log('App is listening on port ' + port);
+server.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}/`);
 });
+
+const gracefulShutdown = async () => {
+  console.log('Received kill signal, shutting down gracefully.');
+
+  // Close the database
+  await closeDatabase();
+
+  server.close(() => {
+    console.log('Closed out remaining connections.');
+    process.exit(0);
+  });
+
+  // Force kill the process if graceful shutdown takes longer than 5 seconds
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down.');
+    process.exit(1);
+  }, 5000);
+};
+
+// Listen for termination signals
+process.on('message', (msg) => {
+  if (msg === 'shutdown') {
+    gracefulShutdown();
+  }
+});
+
+// 2 lines below are in case it runs on a non-Windows environement
+process.on('SIGTERM', gracefulShutdown); // listen for TERM signal (e.g., kill)
+process.on('SIGINT', gracefulShutdown);  // listen for INT signal (e.g., Ctrl+C)
 
 const log_stuff = async () => {
   const mice = await getMice();

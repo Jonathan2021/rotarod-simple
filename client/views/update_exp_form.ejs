@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <%- include('partials/header.ejs') %>
 <body>
+<%- include('partials/connection_warning.ejs') %>
 <div class="popup-window">
   <h2 id="formTitle"></h2>
 
@@ -14,7 +15,7 @@
     <div id="cageDiv">
       <input type="button" value="Paste cage info" id="pasteInfoBtn" class="popup-button">
       <div id="pasteArea" style="display: none;">
-        <p>format : 'cage number' 'mouse id' 'zigosity'</p>
+        <p>format : 'cage number' 'mouse id' 'zigosity' 'treatment (optional)'</p>
         <textarea id="pasteBox" rows="10" cols="30"></textarea>
         <input type="button" value="Apply" id="applyPasteBtn" class="popup-button">
       </div>
@@ -57,6 +58,7 @@
           { name: 'cage_nb', type: 'string' },
           { name: 'ucb_identifier', type: 'string' },
           { name: 'zigosity', type: 'string' },
+          { name: 'treatment', type: 'string' },
         ],
         datatype: 'json'
       };
@@ -76,14 +78,15 @@
               }
               return true;
           }},
-          { text: 'UCB identifier', datafield: 'ucb_identifier', editable: !nruns,
+          { text: 'Mouse ID', datafield: 'ucb_identifier', editable: !nruns,
             validation: function (cell, value) {
               if (isNaN(value)) {
                   return { result: false, message: "Must be a number" };
               }
               return true;
           }},
-          { text: 'Zigosity', datafield: 'zigosity' }
+          { text: 'Group', datafield: 'zigosity' },
+          { text: 'Treatment', datafield: 'treatment'}
       ]
       });
 
@@ -92,6 +95,7 @@
           datarow.cage_nb = "";
           datarow.ucb_identifier = "";
           datarow.zigosity = "";
+          datarow.treatment = "";
           $("#cageGrid").jqxGrid('addrow', null, datarow, 'first');
       });
 
@@ -141,13 +145,18 @@
           }
 
           let parts = lines[i].split('\t');
-          if (parts.length === 3) {
-            // Check if the first two parts are numbers and the third part is a string
-            if (!isNaN(parts[0]) && !isNaN(parts[1]) && isNaN(parts[2])) {
+          if (parts.length === 3 || parts.length === 4) {
+            let treatment = "";
+            if (parts.length === 4)
+              treatment = parts[3].trim();
+            console.log("Parts ", parts.length)
+            // Check if the first two parts are numbers
+            if (!isNaN(parts[0]) && !isNaN(parts[1])) {
               newCageInfo.push({
                 cage_nb: parts[0].trim(),
                 ucb_identifier: parts[1].trim(),
-                zigosity: parts[2].trim()
+                zigosity: parts[2].trim(),
+                treatment
               });
             } else {
               if (newCageInfo.length > 0) {
@@ -158,7 +167,7 @@
             }
           } else {
             // If it is the first line and doesn't have the correct number of columns, skip it
-            if (i == 0 && parts.length !== 3) {
+            if (i == 0 && parts.length !== 3 && parts.length !== 4) {
               continue;
             }
             // If the number of columns is not 3, show an error message
@@ -184,7 +193,8 @@
           const new_info = $("#cageGrid").jqxGrid('getrows').map(row => ({
             cage_nb: parseInt(row.cage_nb),
             ucb_identifier: parseInt(row.ucb_identifier),
-            zigosity: row.zigosity
+            zigosity: row.zigosity,
+            treatment: row.treatment
           }));;
           
 
