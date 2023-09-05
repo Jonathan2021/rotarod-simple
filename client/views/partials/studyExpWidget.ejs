@@ -419,10 +419,8 @@ $(document).ready(function () {
     });
     
     window.addEventListener('storage', function(e){
-        console.log("Storage changed : ", e.key);
         if (e.key === "expUpdate")
         {
-            console.log("refreshing");
             let study_id = $("#jqxListBoxStudy").jqxListBox("getSelectedItem").value;
             refreshExp(study_id).catch(error => console.error(error));
         }
@@ -445,7 +443,6 @@ $(document).ready(function () {
                         type: "POST",
                         data: { title , eth_proj, tickat},
                         success: function (data) {
-                            console.log(data);
                             window.dispatchEvent(studyCreateEvent({ id : data.id }));
                         },
                         error: function(jqXHR)
@@ -491,7 +488,6 @@ $(document).ready(function () {
                         type: "PUT",
                         data: { newTitle , newEthProj, newTickat},
                         success: function (data) {
-                            console.log(data);
                             window.dispatchEvent(studyUpdateEvent({ id : data.id }));
                         },
                         error: function(jqXHR)
@@ -627,7 +623,6 @@ $(document).ready(function () {
             return;
         
         const run_id = selectedRun.value;
-        console.log("/study/" + study_id + "/experiment/" + exp_id + '/run/' + run_id);
         $.ajax({
             url: "/study/" + study_id + "/experiment/" + exp_id + '/run/' + run_id,
             type: 'DELETE',

@@ -34,7 +34,8 @@ This will read the package.json file and install all the necessary local depende
 
 - ### Create the database
 
-Paths to the SQLite databse file for either environments are modifiable in `utils.ts` (make sure the folders exist before running the following).
+Paths to the SQLite databse file for either environments are modifiable in `utils.ts`
+**Make sure the folders exist before running the following**.
 
 Inside the project folder, run:
 `./db-init.sh production` for production

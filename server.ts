@@ -3,8 +3,6 @@ import express from 'express';
 import path from 'path';
 import { setUserAuth, getUserAcc } from './server/controllers/auth';
 import fs from 'fs';
-import { open } from 'sqlite';
-import sqlite3 from 'sqlite3';
 import Excel from 'exceljs';
 import os from "os";
 import http from 'http';
@@ -142,13 +140,9 @@ app.get('/study/:study_id/experiment_data', async(req, res) => {
 
 // Fetching all the runs from an experiment
 app.get('/study/:study_id/experiment/:exp_id/run_data', async(req, res) => {
-  console.log("Getting run data");
   const all_runs = await getRuns();
-  console.log("All runs ", all_runs);
-  console.log("exp_id ", req.params.exp_id);
   try {
     const runs = await getRunsFromExperiment(req.params.exp_id);
-    console.log(runs);
     res.json(runs);
   } catch (err) {
     console.log(err);
@@ -231,7 +225,6 @@ app.get('/study/:study_id/experiment/:exp_id', async (req, res) => {
       res.status(404).send("Couldn't find the requested experiment");
     } else {
       const cage_info = await getCageCompleteFromExp(exp_id);
-      console.log("Got cage info ", cage_info);
       const nbRunsWithTrials = await countRunsWithTrialsExp(exp_id);
       res.render("update_exp_form", { cage_info, study_id, exp, nruns: nbRunsWithTrials });
     }
@@ -267,8 +260,6 @@ interface ICageInfo {
 
 const updateExperimentCages = async (expId: number, cageInfo: ICageInfo[]) => {
   const res = await deleteAllCagesExp(expId);
-  console.log("DELETED ", res);
-  console.log("CAGEINFO", cageInfo);
   
   let grouped = {};
   for (let info of cageInfo)
@@ -277,7 +268,6 @@ const updateExperimentCages = async (expId: number, cageInfo: ICageInfo[]) => {
       grouped[info.cage_nb] = [];
     grouped[info.cage_nb].push({ucb_identifier: info.ucb_identifier, zigosity: info.zigosity, treatment: info.treatment});
   }
-  console.log("GROUPED ", grouped);
   let cage_id;
   for (let cage of Object.keys(grouped)) {
     cage_id = await createCage(cage, expId);
@@ -362,7 +352,6 @@ app.get('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
 // Getting the run page for an existing run
 app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
   const { run_id, exp_id, study_id } = req.params;
-  console.log("Getting run")
   try {
     const run = await getRun(run_id);
     if (!run)
@@ -371,7 +360,6 @@ app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
     } else {
       const cages = await getCageMice(parseInt(exp_id));
       let cage_order = await getCageOrder(run_id);
-      console.log("CAGE ORDER WOOOW ", cage_order);
       // FIXME Hacky solution to someone modifying cages for an experiment with existing runs. Cage_order are deleted and now a new one needs to be done.
       if (!cage_order.length)
       {
@@ -381,7 +369,6 @@ app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
       }
 
       const trials = await getTrialsAndRecords(run_id);
-      console.log("TrialsAndRecords RAW ", trials);
       let only_trials = [];
       let trial_records = {};
       for (let trial_id of Object.keys(trials)) {
@@ -404,11 +391,6 @@ app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
           }
           trial_records[trial_id] = cur_records;
     }
-    console.log("Run ", run);
-    console.log("Cages ", cages);
-    console.log("Cage order", cage_order);
-    console.log("Only trials", only_trials);
-    console.log("Trial records", trial_records);
     res.render('run_form', {study_id, exp_id, run: run, cages : JSON.stringify(cages), cage_order: JSON.stringify(cage_order), trials: JSON.stringify(only_trials), trial_records : JSON.stringify(trial_records)});
   }
   } catch (err) {
@@ -418,14 +400,10 @@ app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
 });
 
 const processRunTrials = async (run_id, trials, trial_records) => {
-  console.log("Processing : ");
-  console.log("trials : ", trials);
-  console.log("records : ", trial_records);
 
   // Fetch existing trials and trial records for the given run
   const existingTrialsAndRecords = await getTrialsAndRecords(run_id);
 
-  console.log("We have the following existing ", existingTrialsAndRecords);
   // Mapping existing trials for easy lookup
   const existingTrialsMap = {};
   Object.keys(existingTrialsAndRecords).forEach(trial_id => {
@@ -434,10 +412,8 @@ const processRunTrials = async (run_id, trials, trial_records) => {
 
   let count = 0;
   // Process Trials
-  console.log("Creating and updating Trials");
   let real_id;
   for (const trial of trials) {
-    console.log("Create Update number ", ++count);
     if (trial.exists) {
       if (!existingTrialsMap[trial.id]) {
         throw new NotFoundError(`No existing trial found with id ${trial.id}`);
@@ -445,9 +421,7 @@ const processRunTrials = async (run_id, trials, trial_records) => {
       await updateTrial(trial.id, trial.trial_nb, trial.trial_time);
     } else {
       real_id = await createTrial(run_id, trial.trial_nb, trial.trial_time);
-      console.log(`real : ${real_id} vs fake ${trial.id}`);
       if (real_id != parseInt(trial.id)) {
-        console.log("Replacing");
         trial_records[real_id] = trial_records[trial.id];
         delete trial_records[trial.id];
         trial.id = real_id;
@@ -464,18 +438,12 @@ const processRunTrials = async (run_id, trials, trial_records) => {
   });
 
   // Process Trial Records
-  console.log("State before record updates");
   const trials_exist = await getTrials();
-  console.log(trials_exist);
-  console.log("trials : ", trials);
   count = 0;
-  console.log("Creating and updating Records");
   for (const trialId in trial_records) {
     for (const mouseId in trial_records[trialId]) {
-      console.log("Create Update number ", ++count);
       const record = trial_records[trialId][mouseId];
       const key = `${trialId}_${mouseId}`;
-      console.log(key);
       const timeRecord = record.time_record || null;
       const rpmRecord = record.rpm_record || null;
       const event = record.event;
@@ -496,23 +464,16 @@ const processRunTrials = async (run_id, trials, trial_records) => {
   }
 
   // Identify and delete trial_records that were removed
-  console.log("Deleting Records");
   for (const key in existingTrialRecordsMap) {
     const [trialId, mouseId] = key.split('_');
     if (!trial_records[trialId] || !trial_records[trialId][mouseId]) {
-      console.log("Deleting Record : (", trialId, "", mouseId, ")");
       await deleteTrialRecord(trialId, mouseId);
     }
   }
 
   // Identify and delete trials that were removed
-  console.log("State before deletion");
-  console.log("trials : ", trials);
-  console.log("records : ", trial_records);
-  console.log("Deleting Trials");
   for (const existingTrialId in existingTrialsMap) {
     if (!trials.some(trial => trial.id == parseInt(existingTrialId))) {
-      console.log("Deleting Trial :", existingTrialId);
       await deleteTrial(existingTrialId);
     }
   }
@@ -536,10 +497,7 @@ app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
     trial_records
    } = req.body;
   try {
-    console.log(is_constant_rpm);
     const id = await createRun(exp_id, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
-    console.log("In create");
-    console.log(cage_order);
     await createCageOrder(id, JSON.parse(cage_order)); // Could move in separate try catch to delete run if problem occurs here
     await processRunTrials(id, JSON.parse(trials), JSON.parse(trial_records));
     res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${id}` });
@@ -582,10 +540,8 @@ app.put('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
 // Delete a study
 app.delete('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
   const run_id = req.params.run_id;
-  console.log("Deleting run ", run_id); 
   try {
     await deleteRun(run_id);
-    console.log("Success");
     res.json({ success: true });
   } catch (err) {
     console.log(err);
@@ -653,7 +609,6 @@ async function generateExcelStudy(studyId, experimentIds, filePath) {
   }
   
   await workbook.xlsx.writeFile(filePath);
-  console.log('Excel file generated successfully!');
 }
 
 async function generateExcelExperiment(experimentId, runIds, filePath) {
@@ -663,7 +618,6 @@ async function generateExcelExperiment(experimentId, runIds, filePath) {
 
   // Save to file
   await workbook.xlsx.writeFile(filePath);
-  console.log('Excel file generated successfully!');
 }
 
 async function fillExcelExperiment(experimentId, runIds, workbook) {
@@ -687,10 +641,7 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
   let trials_per_run = [];
 
   for (const [dayIndex, run_id] of runIds.entries()) {
-    console.log("Day ", dayIndex + 1);
-    console.log("Id : ", run_id);
     const run = await getRun(run_id);
-    console.log("Run ", run);
     const runDate = new Date(run.date_acclim);
 
     const dd = String(runDate.getDate()).padStart(2, '0');
@@ -710,7 +661,6 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
     runsSheet.addRow([`DAY ${dayIndex + 1}_${dateFormatted}`, `place: ${run.place}`, `temp : ${temp_str}`, `humidity : ${humidity_str}`, `luminosity : ${lux_str}`,  `other : ${run.other}`, `Experimentator : ${run.experimentator}`]);
     runsSheet.addRow(['Acclimatation time', timeFormatted]);
     const run_trials = await getTrialsFromRun(run.id);
-    console.log("Trials : ", run_trials);
     trials_per_run.push(run_trials.length);
     trials_row.push.apply(trials_row, [...Array(run_trials.length).fill(undefined).map((_, i) => `T${trial_count + i + 1}_ACC (s)`), `Mean Day ${dayIndex + 1}`]);
     runsSheet.addRow([]);
@@ -730,7 +680,6 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
         const event_mouse = run_trials.map(trial => mouse_trials[trial.id] && mouse_trials[trial.id].event);
         let trial_values : TrialRecord[] = Object.values(mouse_trials);
         trial_values = trial_values.filter(trial => trial.time_record != null);
-        console.log("Values", trial_values);
         const mean_time = trial_values.length ? average(trial_values.map(trial => trial.time_record)) : "";
         let row = runsSheet.addRow([
           mouse.ucb_identifier,
@@ -764,7 +713,6 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
         if (trial_values.length) {
           mouse_day_means[mouse.id].push(mean_time);
         }
-        console.log(time_rec_mouse);
         mouse_rows[mouse.id].push.apply(mouse_rows[mouse.id], [...time_rec_mouse, mean_time]);
         mouse_rows_highlight[mouse.id].push.apply(mouse_rows_highlight[mouse.id], [...event_mouse, false]);
       }
@@ -772,7 +720,6 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
     runsSheet.addRow([]);
   }
 
-  console.log(mouse_rows);
 
   // Create worksheet for aggregate information
   const aggregateSheet = workbook.addWorksheet(experiment.title + ' Aggregate Information');
@@ -963,18 +910,3 @@ process.on('message', (msg) => {
 // 2 lines below are in case it runs on a non-Windows environement
 process.on('SIGTERM', gracefulShutdown); // listen for TERM signal (e.g., kill)
 process.on('SIGINT', gracefulShutdown);  // listen for INT signal (e.g., Ctrl+C)
-
-const log_stuff = async () => {
-  const mice = await getMice();
-  console.log(mice);
-  const cages = await getCages();
-  console.log(cages);
-  //await deleteAllTrialRecords();
-  //await deleteAllTrials();
-  const trials = await getTrials();
-  console.log(trials);
-  const trial_records = await getTrialRecords();
-  console.log(trial_records);
-};
-
-log_stuff();

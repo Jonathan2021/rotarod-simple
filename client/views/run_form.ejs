@@ -98,7 +98,7 @@
 
         function saveRun(onsuccess=defaultSuccess, onerror=defaultError) {
             let run = <%- JSON.stringify(run) %>;
-            let type = 'POST'
+            let type = 'POST';
             let url="/study/<%= study_id %>/experiment/<%= exp_id %>/run";
             if (run) {
                 type = "PUT";
@@ -114,7 +114,6 @@
                 experimentator: $('#experimentator').val(),
                 date_acclim: $('#date_acclim').val(),
                 temperature: $('#temperature').val(),
-                humidity: $('#humidity').val(),
                 lux: $('#lux').val(),
                 other: $('#other').val(),
                 trials: JSON.stringify(trials),
@@ -123,7 +122,6 @@
             
             if (!run)
                 jsonObject['cage_order'] = JSON.stringify(cage_order);
-            console.log(jsonObject);
 
             $.ajax({
                 url: url,
@@ -144,7 +142,6 @@
         trial_records = JSON.parse(<%- JSON.stringify(trial_records) %>);
 
         window.addEventListener('storage', function(e){
-            console.log("RELOADING !!!!")
             if (e.key === "expUpdate") {
                 let newVal = JSON.parse(e.newValue);
                 if (newVal.id == exp_id)
@@ -339,7 +336,6 @@
 
         function saveCageDetails(trial_id = null) {
             trial_nb = trials.find(t => t.id == trial_id).trial_nb;
-            console.log("Saving trial", trial_nb);
             let cageNumber = cage_order[currentCageIndex];
             let mice = cageMice[cageNumber];
 
@@ -348,14 +344,10 @@
                 let seconds = $(".secondsField[data-mouseid='" + mouse_id + "']").val();
                 let rpm = $(".rpmField[data-mouseid='" + mouse_id + "']").val();
                 let event = $(".markCheckbox[data-mouseid='" + mouse_id + "']").is(":checked") ? 1 : 0;
-                console.log("Time ", seconds);
-                console.log("Checkbox ", $(".markCheckbox[data-mouseid='" + mouse_id + "']"));
-                console.log("Event ", event);
                 if (rpm !== "" || seconds !== "") {
                     if (!(mouse_id in trial_records[trial_id])) {
                         trial_records[trial_id][mouse_id] = {exists: false};
                     }
-                    console.log(`${mouse.number} ${seconds} seconds / ${rpm} rpms`);
                     trial_records[trial_id][mouse_id]["time_record"] = seconds;
                     trial_records[trial_id][mouse_id]["rpm_record"] = rpm;
                     trial_records[trial_id][mouse_id]["event"] = event;
@@ -470,10 +462,6 @@
                 if (!(mouse_id in trial_records[trial_id])) {
                     trial_records[trial_id][mouse_id] = {exists: false};
                 }
-                console.log(dataField);
-                console.log(mouse_id);
-                console.log(trial_id);
-                console.log(value);
                 if (dataField.endsWith('_time')) {
                     trial_records[trial_id][mouse_id]["time_record"] = value;
                     if (!trial_records[trial_id][mouse_id]["rpm_record"] && $('#is_constant_rpm').is(":checked")) {
@@ -509,7 +497,6 @@
         function markOrUnmarkCell(eventValue) {
             if (selectedRowIndex !== undefined && selectedDataField) {
                 let record = getRecord(selectedRowIndex, selectedDataField);
-                console.log(record);
                 record["event"] = eventValue;
                 
                 saveRun();
@@ -548,9 +535,8 @@
 
         $('#runForm').on('submit', function(e) {
             e.preventDefault(); // Prevent the default form submission
-            console.log("Submitting form");
             let success = function(data) {
-                    let isCreation = <%= run ? false : true %>
+                    let isCreation = <%= run ? false : true %>;
                     if (data.redirect && isCreation)
                         window.location.href = data.redirect;
                     }
