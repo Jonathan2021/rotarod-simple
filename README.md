@@ -1,6 +1,6 @@
 This was developped with and for Windows. Unix-like systems might require some slight changes.
 
-##Prerequisites
+## Prerequisites
 
 Make sure you have the following software installed. The versions mentioned are the ones this project was developed with; newer versions will likely work but have not been tested.
 
@@ -20,8 +20,8 @@ To set up the project on your local machine, follow these steps:
 - ### Clone the Repository
 
 ```
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/Jonathan2021/rotarod-simple.git
+cd rotarod-simple
 ```
 
 - ### Install Local Dependencies
