@@ -1,11 +1,11 @@
-<div class="main-widget-container flex-container">
+<div class="flex-container">
     <div id="studyDiv">
         <h2>Study</h2>
         <input type="button" value="Add new" id="addBtnStudy" class="widget-button" />
         <input type="button" value="Update Study" id="updateBtnStudy" class="widget-button"/>
         <input type="button" value="Delete" id="deleteBtnStudy" class="widget-button"/>
         <input type="button" value="Export to Excel" id="exportToExcelStudyBtn" class="widget-button"/>
-        <div id="jqxListBoxStudy" , class="list-container"></div>
+        <div id="jqxListBoxStudy", class="list-container"></div>
     </div>
     <div id="expDiv">
         <h2>Experiment</h2>
@@ -30,7 +30,7 @@
 <div id="expsDialog" title="Select Experiments to Export">
     <div id="jqxListBoxExpDialog"></div>
 </div>
-<div id="studyDialog" title="Enter Study Details">
+<div id="studyDialog" title="Enter Study Details" hidden>
     <p>Title:</p>
     <input type="text" id="studyTitleInput">
     <p>Ethical Project:</p>
@@ -112,7 +112,29 @@ let refreshRun = function (study_id, exp_id) {
             success: function (data) {
                 for (var i = 0; i < data.length; i++) {
                     let originalDate = new Date(data[i].date_acclim);
-                    let formattedDate = originalDate.getDate() + "/" + (originalDate.getMonth() + 1) + "/" + originalDate.getFullYear();
+
+                    // Get date in 'dd' format
+                    let date = originalDate.getDate();
+                    date = date < 10 ? '0' + date : date;
+
+                    // Get month in 'mm' format
+                    let month = originalDate.getMonth() + 1;
+                    month = month < 10 ? '0' + month : month;
+
+                    // Get year in 'yyyy' format
+                    let year = originalDate.getFullYear();
+
+                    // Get hours in 'hh' format
+                    let hours = originalDate.getHours();
+                    hours = hours < 10 ? '0' + hours : hours;
+
+                    // Get minutes in 'mm' format
+                    let minutes = originalDate.getMinutes();
+                    minutes = minutes < 10 ? '0' + minutes : minutes;
+
+                    // Combine them all
+                    let formattedDate = `${date}/${month}/${year} ${hours}:${minutes}`;
+
                     data[i].date_acclim = formattedDate;
                 }
                 sourceRun.localdata = data;
@@ -408,6 +430,18 @@ $(document).ready(function () {
         }).catch(error => console.error(error));
     });
 
+    window.addEventListener('studyDelete', function(e){
+        $('#jqxListBoxStudy').jqxListBox('removeItem', e.detail.id);
+        $('#jqxListBoxRun').jqxListBox('clearSelection');
+        $('#jqxListBoxExp').jqxListBox('clearSelection');
+        $('#jqxListBoxStudy').jqxListBox('clearSelection');
+        hideRun();
+        disableButtonsRun();
+        hideExp();
+        disableButtonsExp();
+        disableButtonsStudy();
+    });
+
     window.addEventListener('studyUpdate', function(e){
         refreshStudy().catch(error => console.error(error));
     });
@@ -416,6 +450,22 @@ $(document).ready(function () {
         refreshExp(e.detail.study_id).then( () => {
                 $('#jqxListBoxExp').jqxListBox('selectItem', e.detail.id);
             }).catch(error => console.error(error));
+    });
+    
+    window.addEventListener('expDelete', function(e){
+        $('#jqxListBoxExp').jqxListBox('removeItem', e.detail.id);
+        $('#jqxListBoxRun').jqxListBox('clearSelection');
+        $('#jqxListBoxExp').jqxListBox('clearSelection');
+        hideRun();
+        disableButtonsRun();
+        disableButtonsExp();
+    });
+
+    window.addEventListener('runDelete', function(e){
+        console.log("run delete");
+        $('#jqxListBoxRun').jqxListBox('removeItem', e.detail.id);
+        $('#jqxListBoxRun').jqxListBox('clearSelection');
+        disableButtonsRun();
     });
     
     window.addEventListener('storage', function(e){
@@ -525,7 +575,6 @@ $(document).ready(function () {
             url: '/study/' + study_id,
             type: 'DELETE',
             success: function () {
-                $('#jqxListBoxStudy').jqxListBox('removeItem', selectedStudy);
                 window.dispatchEvent(studyDeleteEvent({id : study_id }));
             },
             error: function (jqXHR) {
@@ -544,6 +593,7 @@ $(document).ready(function () {
                 url: "/study/" + study_id + "/experiment",
                 type: "POST",
                 data: { title },
+                async: false,
                 success: function (data) {
                     window.dispatchEvent(expCreateEvent({ id: data.id, study_id : study_id }));
                     window.open('/study/' + study_id + '/experiment/' + data.id, 'Update Exp form' + data.id, 'width=750,height=750');
@@ -584,7 +634,6 @@ $(document).ready(function () {
             url: "/study/" + study_id + "/experiment/" + exp_id,
             type: 'DELETE',
             success: function() {
-                $('#jqxListBoxExp').jqxListBox('removeItem', selectedExp);
                 window.dispatchEvent(expDeleteEvent({id : exp_id }));
             },
             error: function (jqXHR) {
@@ -627,7 +676,6 @@ $(document).ready(function () {
             url: "/study/" + study_id + "/experiment/" + exp_id + '/run/' + run_id,
             type: 'DELETE',
             success: function() {
-                $('#jqxListBoxRun').jqxListBox('removeItem', selectedRun);
                 window.dispatchEvent(runDeleteEvent({id : run_id }));
             },
             error: function (jqXHR) {

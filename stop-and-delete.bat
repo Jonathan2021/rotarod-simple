@@ -1,0 +1,1 @@
+pm2 stop rotarod-server && pm2 delete rotarod-server && echo "Apps stopped and deleted."

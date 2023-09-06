@@ -2,15 +2,15 @@ import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import path from 'path';
 
-//export const dbPath = path.join(__dirname, 'database', 'myDatabase.db');
 let dbPath: string;
 
 if (process.env.NODE_ENV === 'development') {
-  dbPath = path.join(__dirname, 'database', 'myDatabase.db');
+  dbPath = path.join(__dirname, 'databaseDEV.db');
 } else if (process.env.NODE_ENV === 'production') {
-  dbPath = '\\\\ncdata-prd-storage.dir.ucb-group.com\\ncd_data$\\Noldus_Ethovision\\Rotarod\\database.db';
+  dbPath = path.join(__dirname, 'databasePROD.db');
+  //dbPath = '\\\\ncdata-prd-storage.dir.ucb-group.com\\ncd_data$\\Noldus_Ethovision\\Rotarod\\database.db';
 } else {
-  throw new Error('NODE_ENV not set');
+  throw new Error('NODE_ENV set to ' + process.env.NODE_ENV + ', but should be either development or production');
 }
 
 export { dbPath };
@@ -31,11 +31,11 @@ export const getDatabase = async (): Promise<Database> => {
     return dbInstance;
 };
 
-export const closeDatabase = async (): Promise<void> => {
-    if (dbInstance) {
-        await dbInstance.close();
-        dbInstance = null;
-    }
+export const closeDatabase = async () => {
+  if (dbInstance !== null) {
+    await dbInstance.close();
+    console.log('Database connection closed.');
+  }
 };
 
 export const isUniqueConstraintError = function (error) { return (error.code === "SQLITE_CONSTRAINT") };
@@ -393,9 +393,6 @@ export const getCageOrder = async (run_id) => {
 };
 
 export const createCageOrder = async (run_id, order) => {
-  console.log("In utils");
-  console.log(order);
-  console.log(order[0]);
   const db = await getDatabase();
 
   // Fetch experiment id for given run id

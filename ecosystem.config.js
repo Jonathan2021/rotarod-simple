@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'rotarod-server',
-      script: './start-server.sh',
+      script: './start-server.js',
       instances: 1,
       autorestart: true,
       watch: false,

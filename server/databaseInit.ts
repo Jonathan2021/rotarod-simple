@@ -33,7 +33,7 @@ async function createIndexIfNotExists(db, indexName, indexSchema) {
       "study_id" INTEGER,
       "title" VARCHAR,
       "creation_dt" TIMESTAMP,
-      FOREIGN KEY ("study_id") REFERENCES "Study" ("id")
+      FOREIGN KEY ("study_id") REFERENCES "Study" ("id") ON DELETE CASCADE
     )`);
 
   await createTableIfNotExists(db, 'Cage', `
@@ -41,7 +41,7 @@ async function createIndexIfNotExists(db, indexName, indexSchema) {
       "id" INTEGER PRIMARY KEY,
       "cage_nb" INTEGER,
       "exp_id" INTEGER,
-      FOREIGN KEY ("exp_id") REFERENCES "Experiment" ("id")
+      FOREIGN KEY ("exp_id") REFERENCES "Experiment" ("id") ON DELETE CASCADE
     )`);
 
   await createTableIfNotExists(db, 'Mouse', `
@@ -67,7 +67,7 @@ async function createIndexIfNotExists(db, indexName, indexSchema) {
       "humidity" VARCHAR,
       "lux" VARCHAR,
       "other" VARCHAR,
-      FOREIGN KEY ("experiment_id") REFERENCES "Experiment" ("id")
+      FOREIGN KEY ("experiment_id") REFERENCES "Experiment" ("id") ON DELETE CASCADE
     )`);
 
   await createTableIfNotExists(db, 'Run_Ordering', `
@@ -96,8 +96,8 @@ async function createIndexIfNotExists(db, indexName, indexSchema) {
       "time_record" INTEGER,
       "rpm_record" INTEGER,
       "event" INTEGER CHECK("event" IN (0,1)),
-      FOREIGN KEY ("trial_id") REFERENCES "Trial" ("id"),
-      FOREIGN KEY ("mouse_id") REFERENCES "Mouse" ("id")
+      FOREIGN KEY ("trial_id") REFERENCES "Trial" ("id") ON DELETE CASCADE,
+      FOREIGN KEY ("mouse_id") REFERENCES "Mouse" ("id") ON DELETE SET NULL
     )`);
 
   // Create indices if they don't exist

@@ -87,6 +87,7 @@
         let trial_records;
         let cageMice;
         let cage_order;
+        let run;
         $(document).ready(function() {
         
             let defaultError = function (jqXHR) {
@@ -94,10 +95,20 @@
                     alert(errorMessage);
         }
         
-        let defaultSuccess = function(data) {};
+        let defaultSuccess = function(data) {
+            console.log(data);
+            if (data.trials)
+                trials = JSON.parse(data.trials);
+            if (data.trial_records)
+                trial_records = JSON.parse(data.trial_records);
+            if (data.id_changes) {
+                id_changes = JSON.parse(data.id_changes);
+                if (id_changes[currentTrialId])
+                    currentTrialId = id_changes[currentTrialId];
+            }
+        };
 
         function saveRun(onsuccess=defaultSuccess, onerror=defaultError) {
-            let run = <%- JSON.stringify(run) %>;
             let type = 'POST';
             let url="/study/<%= study_id %>/experiment/<%= exp_id %>/run";
             if (run) {
@@ -138,8 +149,10 @@
         let exp_id = <%- exp_id %>;
         cageMice = JSON.parse(<%- JSON.stringify(cages) %>);
         cage_order = <%- cage_order %>;
+
         trials = JSON.parse(<%- JSON.stringify(trials) %>);
         trial_records = JSON.parse(<%- JSON.stringify(trial_records) %>);
+        run = <%- JSON.stringify(run) %>;
 
         window.addEventListener('storage', function(e){
             if (e.key === "expUpdate") {
@@ -212,6 +225,7 @@
                         trial_records[trial_id] = {};
                         currentTrialId = trial_id;
                         currentCageIndex = 0;
+                        saveRun();
                         showCageDetails(trial_id);
                         $(this).dialog("close");
                     },
@@ -253,6 +267,7 @@
                             trial.trial_time = $("#trialTimeInput").val();
                             trial.trial_nb = $("#trialNbInput").val();
                             currentCageIndex = 0;
+                            saveRun();
                             showCageDetails(currentTrialId);
                             $(this).dialog("close");
                         },
@@ -524,14 +539,17 @@
             return hours + ':' + minutes;
         }
         
-
-
         $('#menuButton').on('click', function() {
-            let success = function(data) {
+            if (run || (!run && confirm("Do you want to save this new run ?"))) {
+                let success = function(data) {
+                window.location.href = "/main";
+                }
+                saveRun(success);
+            }
+            else {
                 window.location.href = "/main";
             }
-            saveRun(success);
-        })
+        });
 
         $('#runForm').on('submit', function(e) {
             e.preventDefault(); // Prevent the default form submission

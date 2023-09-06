@@ -52,8 +52,6 @@ app.use(
   })
 );
 
-const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8080;
-
 // Enable CORS
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -341,13 +339,39 @@ app.get('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
   {
     const cages = await getCageMice(parseInt(exp_id));
     const cage_order = shuffleArray(Object.keys(cages)).map(Number);
-    console.log(cage_order);
     res.render('run_form', {study_id, exp_id, run: null, cages : JSON.stringify(cages), cage_order: JSON.stringify(cage_order), trials: JSON.stringify([]), trial_records : JSON.stringify([])});
   } catch (err) {
     console.log(err);
     res.status(500).send("An error occured while retrieving the cages");
   }
 });
+
+const formatTrialsAndRecords = async (run_id) => {
+  const trials = await getTrialsAndRecords(run_id);
+  let only_trials = [];
+  let trial_records = {};
+  for (let trial_id of Object.keys(trials)) {
+      only_trials.push({
+        id: trial_id,
+        trial_time: trials[trial_id].trial_time,
+        trial_nb: trials[trial_id].trial_nb,
+        exists: true,
+      });
+      let cur_records = {};
+      for (let record of trials[trial_id].records) {
+        if (record.mouse_id) {
+          cur_records[record.mouse_id] = {
+            time_record: record.time_record ? record.time_record : "",
+            rpm_record: record.rpm_record ? record.rpm_record : "",
+            event: record.event ? record.event : 0,
+            exists: true
+          };
+        }
+      }
+      trial_records[trial_id] = cur_records;
+  }
+  return {only_trials, trial_records};
+};
 
 // Getting the run page for an existing run
 app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
@@ -368,31 +392,10 @@ app.get('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
           await createCageOrder(run_id, cage_order);
       }
 
-      const trials = await getTrialsAndRecords(run_id);
-      let only_trials = [];
-      let trial_records = {};
-      for (let trial_id of Object.keys(trials)) {
-          only_trials.push({
-            id: trial_id,
-            trial_time: trials[trial_id].trial_time,
-            trial_nb: trials[trial_id].trial_nb,
-            exists: true,
-          });
-          let cur_records = {};
-          for (let record of trials[trial_id].records) {
-            if (record.mouse_id) {
-              cur_records[record.mouse_id] = {
-                time_record: record.time_record ? record.time_record : "",
-                rpm_record: record.rpm_record ? record.rpm_record : "",
-                event: record.event ? record.event : 0,
-                exists: true
-              };
-            }
-          }
-          trial_records[trial_id] = cur_records;
-    }
+    const {only_trials, trial_records } = await formatTrialsAndRecords(run_id);
+    
     res.render('run_form', {study_id, exp_id, run: run, cages : JSON.stringify(cages), cage_order: JSON.stringify(cage_order), trials: JSON.stringify(only_trials), trial_records : JSON.stringify(trial_records)});
-  }
+    }
   } catch (err) {
     console.log(err);
     res.status(500).send("An error occured while retrieving the run's information");
@@ -413,6 +416,9 @@ const processRunTrials = async (run_id, trials, trial_records) => {
   let count = 0;
   // Process Trials
   let real_id;
+
+  let id_changes = {};
+
   for (const trial of trials) {
     if (trial.exists) {
       if (!existingTrialsMap[trial.id]) {
@@ -422,6 +428,7 @@ const processRunTrials = async (run_id, trials, trial_records) => {
     } else {
       real_id = await createTrial(run_id, trial.trial_nb, trial.trial_time);
       if (real_id != parseInt(trial.id)) {
+        id_changes[trial.id] = real_id;
         trial_records[real_id] = trial_records[trial.id];
         delete trial_records[trial.id];
         trial.id = real_id;
@@ -477,6 +484,7 @@ const processRunTrials = async (run_id, trials, trial_records) => {
       await deleteTrial(existingTrialId);
     }
   }
+  return id_changes;
 };
 
 // Creating a run
@@ -499,8 +507,9 @@ app.post('/study/:study_id/experiment/:exp_id/run', async (req, res) => {
   try {
     const id = await createRun(exp_id, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
     await createCageOrder(id, JSON.parse(cage_order)); // Could move in separate try catch to delete run if problem occurs here
-    await processRunTrials(id, JSON.parse(trials), JSON.parse(trial_records));
-    res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${id}` });
+    const id_changes = await processRunTrials(id, JSON.parse(trials), JSON.parse(trial_records));
+    const formated = await formatTrialsAndRecords(id);
+    res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${id}`,  trials: JSON.stringify(formated.only_trials), trial_records: JSON.stringify(formated.trial_records), id_changes: JSON.stringify(id_changes)});
   } catch (err) {
     console.log(err);
     res.status(500).send("An error occured while creating the run");
@@ -525,8 +534,9 @@ app.put('/study/:study_id/experiment/:exp_id/run/:run_id', async (req, res) => {
    } = req.body;
   try {
     await updateRun(run_id, place, is_constant_rpm, rpm, experimentator, date_acclim, temperature, humidity, lux, other);
-    await processRunTrials(run_id, JSON.parse(trials), JSON.parse(trial_records));
-    res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${run_id}` });
+    const id_changes = await processRunTrials(run_id, JSON.parse(trials), JSON.parse(trial_records));
+    const formated = await formatTrialsAndRecords(run_id);
+    res.json({ redirect: `/study/${req.params.study_id}/experiment/${req.params.exp_id}/run/${run_id}`, trials: JSON.stringify(formated.only_trials), trial_records: JSON.stringify(formated.trial_records), id_changes: JSON.stringify(id_changes)});
   } catch (err) {
     console.log(err);
     if(err instanceof NotFoundError) {
@@ -878,8 +888,10 @@ app.post('/study/:study_id/export_runs_to_excel', async (req, res) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}/`);
+const port: number = process.env.ROTARODPORT ? parseInt(process.env.ROTARODPORT) : 5001;
+
+server.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port: ${port}/`);
 });
 
 const gracefulShutdown = async () => {

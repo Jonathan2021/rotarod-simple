@@ -38,19 +38,16 @@ Paths to the SQLite databse file for either environments are modifiable in `util
 **Make sure the folders exist before running the following**.
 
 Inside the project folder, run:
-`./db-init.sh production` for production
-`./db-init.sh development` for development
-
-
+`./db-init.bat` (for the production database)
 
 - ### Start the Project
 
 After installing the dependencies, you can start the project with pm2 using:
 
-`./start.sh --env production` (no `--env` or `--env development` for the development environment)
+`./start.bat
 
 If you do not wish to use PM2, run with:
-`NODE_ENV=production npx ts-node server.ts` (replace `production` with `development` if needed)
+`set NODE_ENV=production npx ts-node server.ts` (replace `production` with `development` if needed)
 
 or with:
 `npm start` This will run the command specified under the "start" script in your package.json, which starts the development server.
