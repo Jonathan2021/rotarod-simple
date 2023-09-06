@@ -51,3 +51,7 @@ If you do not wish to use PM2, run with:
 
 or with:
 `npm start` This will run the command specified under the "start" script in your package.json, which starts the development server.
+
+## WARNING
+
+We are using SQLite and MemoryStore for now. You might want to migrate to another databse at some point and to change the store (to Redis or Mongo) to use more than 1 instance in pm2 (a cluster).
