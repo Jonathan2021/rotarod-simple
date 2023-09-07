@@ -1,5 +1,4 @@
-Ability to select cages used in a run ?
-trial_time show whole date_time on prompt. Store as Date in db.
-trial_nb increment between runs. Check that it is an int.
-Title in header.
-Move utility fns from server to another file.
+Make it so that the dialog window for trials doesn't prevent from editing the parent window (when marking a mouse by checking the checkbox, the user might want to wrtie in "other" what this is about)
+Make each modification in the Run (trial time etc.) as individual post / put requests and not one big request with all the data.
+You may want trial_nb increment between runs (basically the first run would have trial numbers 1, 2, 3 and then a new run would start at 4. This is done in the excel export but not in the app). Check that it is an int.
+Move utility fns from server to another file (cleaner).
