@@ -361,9 +361,9 @@ const formatTrialsAndRecords = async (run_id) => {
       for (let record of trials[trial_id].records) {
         if (record.mouse_id) {
           cur_records[record.mouse_id] = {
-            time_record: record.time_record ? record.time_record : "",
-            rpm_record: record.rpm_record ? record.rpm_record : "",
-            event: record.event ? record.event : 0,
+            time_record: record.time_record != null ? record.time_record : "",
+            rpm_record: record.rpm_record != null ? record.rpm_record : "",
+            event: record.event ? record.event != null : 0,
             exists: true
           };
         }
@@ -451,10 +451,10 @@ const processRunTrials = async (run_id, trials, trial_records) => {
     for (const mouseId in trial_records[trialId]) {
       const record = trial_records[trialId][mouseId];
       const key = `${trialId}_${mouseId}`;
-      const timeRecord = record.time_record || null;
-      const rpmRecord = record.rpm_record || null;
-      const event = record.event;
-      if (timeRecord || event)
+      const timeRecord = record.time_record != null ? record.time_record : null;
+      const rpmRecord = record.rpm_record != null ? record.rpm_record : null;
+      const event = record.event != null ? record.event : 0;
+      if (timeRecord != null || event != null)
       {
         if (record.exists) {
           if (!existingTrialRecordsMap[key]) {
@@ -686,7 +686,7 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
       
       for (let mouse of mice) {
         const mouse_trials = await getTrialsFromRunForMouse(run.id, mouse.id);
-        const time_rec_mouse = run_trials.map(trial => mouse_trials[trial.id] && mouse_trials[trial.id].time_record ? mouse_trials[trial.id].time_record : "");
+        const time_rec_mouse = run_trials.map(trial => mouse_trials[trial.id] && mouse_trials[trial.id].time_record != null ? mouse_trials[trial.id].time_record : "");
         const event_mouse = run_trials.map(trial => mouse_trials[trial.id] && mouse_trials[trial.id].event);
         let trial_values : TrialRecord[] = Object.values(mouse_trials);
         trial_values = trial_values.filter(trial => trial.time_record != null);
@@ -695,7 +695,7 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
           mouse.ucb_identifier,
           cage.cage_nb,
           ...time_rec_mouse,
-          ...run_trials.map(trial => mouse_trials[trial.id] ? mouse_trials[trial.id].rpm_record : "")
+          ...run_trials.map(trial => mouse_trials[trial.id] && mouse_trials[trial.id].rpm_record != null ? mouse_trials[trial.id].rpm_record : "")
         ]);
 
         
@@ -757,6 +757,27 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
       let cell = row.getCell(incr);
       cell.font = { bold: true };
     }
+    
+    function addMeanFormulas(row) {
+      let incr = 4 + 1 // Id, Cage, Group, Treatment + 1 because 1 indexed
+      const currentRow = row.number;
+      let mean_cells = [];
+      trials_per_run.forEach((nb_trials) => {
+        if (nb_trials) {
+        let cell = row.getCell(nb_trials + incr);
+        let start_cell = row.getCell(incr);
+        let stop_cell = row.getCell(incr + nb_trials - 1);
+        cell.value = { formula : `AVERAGE(${start_cell.address}:${stop_cell.address})`, result: cell.value };
+
+        mean_cells.push(cell);
+        }
+        incr += nb_trials + 1;
+      });
+
+      let cell = row.getCell(incr);
+      let formulaCells = mean_cells.map(c => c.address).join(',');
+      cell.value = { formula : `AVERAGE(${formulaCells})`, result: cell.value };
+    }
 
     boldRow(row);
     
@@ -777,6 +798,7 @@ async function fillExcelExperiment(experimentId, runIds, workbook) {
         }
       });
       boldRow(row);
+      addMeanFormulas(row);
     }
   }
 
