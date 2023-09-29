@@ -10,43 +10,59 @@
     <h2><%= run ? 'Edit' : 'New' %> Run</h2>
     <h3>Linked to <a href="javascript:window.open('/study/<%= study_id %>/experiment/<%= exp_id %>', 'Update exp <%= exp_id %>', 'width=750, height=750')">the following experiment</a></h3>
 
-    <form id="runForm" method="post">
-        <label for="is_constant_rpm">Constant RPM:</label>
-        <input type="checkbox" id="is_constant_rpm" name="is_constant_rpm" <%= (run && run.is_constant_rpm == 1) ? 'checked' : '' %>>
+    <form id="runForm" method="post", class="form-fields">
+        <div class="form-group checkbox-group">
+            <label for="is_constant_rpm" class="checkbox-label">Constant RPM:</label>
+            <input type="checkbox" id="is_constant_rpm" name="is_constant_rpm" <%= (run && run.is_constant_rpm == 1) ? 'checked' : '' %>>
+        </div>
 
-        <div id="rpm_field" style="<%= !(run && run.is_constant_rpm == 1) ? 'display: none;' : '' %>">
+        <div class="form-group rpm-group" id="rpm_field" style="<%= !(run && run.is_constant_rpm == 1) ? 'display: none;' : '' %>">
             <label for="rpm">Value of constant RPM:</label>
             <input type="number" id="rpm" name="rpm" value="<%= run ? run.rpm : '' %>">
         </div>
 
-        <label for="experimentator">Experimentator:</label>
-        <input type="text" id="experimentator" name="experimentator" value="<%= run ? run.experimentator : '' %>">
-        
-        <label for="place">Room:</label>
-        <input type="text" id="place" name="place" value="<%= run ? run.place : '' %>">
+        <div class="form-group">
+            <label for="experimentator">Experimentator:</label>
+            <input type="text" id="experimentator" name="experimentator" value="<%= run ? run.experimentator : '' %>">
+        </div>
 
-        <label for="date_acclim">Date and acclimatation time:</label>
-        <%
-        function toLocalISOString(date) {
-            let tzoffset = date.getTimezoneOffset() * 60000;
-            let localISOTime = (new Date(date - tzoffset)).toISOString().slice(0,-1);
-            return localISOTime.slice(0, 16);
-        }
-        %>
-        <input type="datetime-local" id="date_acclim" name="date_acclim" value='<%= run && run.date_acclim !=="" ? run.date_acclim : toLocalISOString(new Date()) %>'>
+        <div class="form-group">
+            <label for="place">Room:</label>
+            <input type="text" id="place" name="place" value="<%= run ? run.place : '' %>">
+        </div>
 
-        <label for="temperature">Temperature:</label>
-        <input type="text" id="temperature" name="temperature" value="<%= run ? run.temperature : '' %>">
+        <div class="form-group">
+            <label for="date_acclim">Date and acclimatation time:</label>
+            <%
+            function toLocalISOString(date) {
+                let tzoffset = date.getTimezoneOffset() * 60000;
+                let localISOTime = (new Date(date - tzoffset)).toISOString().slice(0,-1);
+                return localISOTime.slice(0, 16);
+            }
+            %>
+            <input type="datetime-local" id="date_acclim" name="date_acclim" value='<%= run && run.date_acclim !=="" ? run.date_acclim : toLocalISOString(new Date()) %>'>
+        </div>
 
-        <label for="humidity">Humidity:</label>
-        <input type="text" id="humidity" name="humidity" value="<%= run ? run.humidity : '' %>">
+        <div class="form-group">
+            <label for="temperature">Temperature:</label>
+            <input type="text" id="temperature" name="temperature" value="<%= run ? run.temperature : '' %>">
+        </div>
 
-        <label for="lux">Lux (100-150):</label>
-        <input type="text" id="lux" name="lux" value="<%= run ? run.lux : '' %>">
 
-        <label for="other">Other:</label>
-        <textarea id="other" rows="10" cols="30"><%= run ? run.other : '' %></textarea>
-        <!-- <input type="text" id="other" name="other" value="<%= run ? run.other : '' %>"> -->
+        <div class="form-group">
+            <label for="humidity">Humidity:</label>
+            <input type="text" id="humidity" name="humidity" value="<%= run ? run.humidity : '' %>">
+        </div>
+
+        <div class="form-group">
+            <label for="lux">Lux (100-150):</label>
+            <input type="text" id="lux" name="lux" value="<%= run ? run.lux : '' %>">
+        </div>
+
+        <div class="form-group">
+            <label for="other">Other:</label>
+            <textarea id="other" rows="3" style="width: 100%; box-sizing: border-box;"><%= run ? run.other : '' %></textarea>
+        </div>
 
         <h3 id="orderInfo"></h3>
         <button class="form-button" type="submit">Save Run</button>
@@ -176,7 +192,7 @@
 
          $("#trialDialog").dialog({
             autoOpen: false,
-            modal: true,
+            modal: false,
             width: 400,
             beforeClose: function() {
                 saveCageDetails(currentTrialId);
@@ -448,6 +464,7 @@
 
             $("#jqxGridTrials").jqxGrid({
             width: '100%',
+            height: 600, // Arbitrary. Better if flexible
             source: dataAdapter,
             columns: columns,
             columnsresize: true,

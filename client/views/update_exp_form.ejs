@@ -34,7 +34,6 @@
   <script>
     $(document).ready(function () {
       let dispatchUpdate = function(id) {
-        console.log("Dispatched the event with id ", id);
         localStorage.setItem('expUpdate', JSON.stringify({date : new Date, id }));
       };
 
@@ -149,7 +148,6 @@
             let treatment = "";
             if (parts.length === 4)
               treatment = parts[3].trim();
-            console.log("Parts ", parts.length)
             // Check if the first two parts are numbers
             if (!isNaN(parts[0]) && !isNaN(parts[1])) {
               newCageInfo.push({
@@ -203,7 +201,6 @@
             type: 'PUT',
             data: {title, cage_info: JSON.stringify(new_info)},
             success: function (data) {
-              console.log("Data ", data);
               dispatchUpdate(data.id);
               window.close(); // close this popup window
             },

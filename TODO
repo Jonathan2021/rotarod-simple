@@ -1,4 +1,11 @@
-Make it so that the dialog window for trials doesn't prevent from editing the parent window (when marking a mouse by checking the checkbox, the user might want to wrtie in "other" what this is about)
-Make each modification in the Run (trial time etc.) as individual post / put requests and not one big request with all the data.
-You may want trial_nb increment between runs (basically the first run would have trial numbers 1, 2, 3 and then a new run would start at 4. This is done in the excel export but not in the app). Check that it is an int.
-Move utility fns from server to another file (cleaner).
+Titre pour les Runs:
+    - Ajouter une colonne dans la database et migrer les entrées existantes.
+    - Ajouter un champ dans le formulaire de modification du Run avec le titre
+    - Afficher le titre à gauche de la date dans le menu principal dans la liste des runs.
+
+
+OPTIONAL:
+Revenir au menu principal garde la sélection d'avant (par example t'ouvres un run puis tu reviens au menu, les mêmes choses doivent être sélectionnées)
+Moyenne par groupe de traitement (groupe (zigosity) + traitement) dans le excel aggregé.
+Rendre la taille de la grille pour encoder les temps (dans le formulaire pour les Runs) adaptable en hauteur pour que si la fenêtre est rapetissée, les boutons sont toujours visibles et la hauteur de la grille s'adapte (scroll).
+Plutôt que de sauvegarder tout à chaque modification (dans la page de modification d'un run), faire des requête pour la modification de l'objet en question uniquement (plus propre et efficace mais la solution actuelle marche bien)

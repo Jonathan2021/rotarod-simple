@@ -5,13 +5,40 @@ html, body {
 }
 
 .form-container {
-    width: 300px;
-    padding: 16px;
+    width: 75%; /* Adjust width as needed */
+    padding: 5px;
     background-color: white;
     margin: 0 auto;
-    margin-top: 15%;
     border: 1px solid black;
     border-radius: 4px;
+}
+
+.form-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.form-group {
+    flex: 1 1 calc(50% - 8px); /* Makes each group take up roughly half of the container width */
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+}
+
+.checkbox-label {
+    margin-right: 10px;
+}
+
+.checkbox-group,
+.rpm-group {
+    flex: 0 0 auto;
+}
+
+.textarea-group {
+    flex: 1 1 100%; /* Makes the textarea group take up the full width of the container */
 }
 
 .form-container h2 {

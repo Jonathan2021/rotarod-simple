@@ -44,7 +44,7 @@ Inside the project folder, run:
 
 After installing the dependencies, you can start the project with pm2 using:
 
-`./start.bat
+`./start.bat`
 
 If you do not wish to use PM2, run with:
 `set NODE_ENV=production npx ts-node server.ts` (replace `production` with `development` if needed)
